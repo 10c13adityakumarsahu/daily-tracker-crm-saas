@@ -13,28 +13,35 @@ class User(AbstractUser):
 
 class Organization(models.Model):
     name = models.CharField(max_length=255)
-    created_at = models.DateTimeField(auto_now_add=True)
-    manager = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, related_name='managed_org')
-    has_portal_access = models.BooleanField(default=False) # Requires admin approval
-    address = models.TextField(blank=True)
-    contact_email = models.EmailField(blank=True)
-    phone_number = models.CharField(max_length=20, blank=True)
-    description = models.TextField(blank=True)
-    subscription_plan = models.CharField(max_length=50, default='TRIAL')
-    license_key = models.CharField(max_length=100, blank=True, unique=True, null=True)
-    subscription_duration_months = models.IntegerField(default=1)
+    manager = models.OneToOneField(User, on_delete=models.CASCADE, related_name='managed_org')
+    
+    # Scheduling Config
+    school_start_time = models.TimeField(null=True, blank=True, default='08:30:00')
+    school_end_time = models.TimeField(null=True, blank=True, default='15:30:00')
+    period_duration_minutes = models.IntegerField(null=True, blank=True, default=45)
+    break_duration_minutes = models.IntegerField(null=True, blank=True, default=15)
+    break_after_period = models.IntegerField(null=True, blank=True, default=3) 
+    
+    # Meta / Subscription
+    subscription_plan = models.CharField(max_length=50, default='FREE')
     subscription_expiry = models.DateTimeField(null=True, blank=True)
+    subscription_duration_months = models.IntegerField(default=12) # For payment calculation
     is_payment_verified = models.BooleanField(default=False)
+    license_key = models.CharField(max_length=100, blank=True, null=True)
     is_license_generated = models.BooleanField(default=False)
+    has_portal_access = models.BooleanField(default=False) # Only if key applied
+
+    # Custom Field Configurations (JSON storage for flexibility)
     student_fields_config = models.JSONField(default=list, blank=True)
     instructor_fields_config = models.JSONField(default=list, blank=True)
+    custom_intervals = models.JSONField(default=list, blank=True) # [{name, start, end}]
     licensing_details = models.JSONField(default=dict, blank=True)
 
 class Instructor(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='instructor_profile')
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='instructors')
     registration_number = models.CharField(max_length=100, blank=True, null=True)
-    designation = models.CharField(max_length=255, blank=True)
+    designation = models.CharField(max_length=255, blank=True, null=True)
     custom_data = models.JSONField(default=dict, blank=True)
     
 class Classroom(models.Model):
@@ -49,7 +56,7 @@ class Subject(models.Model):
     name = models.CharField(max_length=255) # e.g. "Mathematics"
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='subjects')
     classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE, related_name='subjects', null=True, blank=True)
-    instructor = models.ForeignKey(Instructor, on_delete=models.SET_NULL, null=True, blank=True, related_name='taught_subjects')
+    instructors = models.ManyToManyField(Instructor, related_name='taught_subjects', blank=True)
 
     def __str__(self):
         return f"{self.name} ({self.classroom.name if self.classroom else 'No Class'})"
@@ -61,8 +68,8 @@ class Parent(models.Model):
 
 class Student(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='student_profile', null=True, blank=True)
-    first_name = models.CharField(max_length=255)
-    last_name = models.CharField(max_length=255)
+    first_name = models.CharField(max_length=255, blank=True, null=True)
+    last_name = models.CharField(max_length=255, blank=True, null=True)
     registration_number = models.CharField(max_length=100, blank=True, null=True)
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='students')
     classroom = models.ForeignKey(Classroom, on_delete=models.SET_NULL, null=True, blank=True, related_name='students')
@@ -73,8 +80,7 @@ class Student(models.Model):
 
 class Timetable(models.Model):
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
-    instructor = models.ForeignKey(Instructor, on_delete=models.CASCADE)
-    subject = models.CharField(max_length=255)
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='timetables')
     day_of_week = models.IntegerField(choices=[(i, i) for i in range(7)]) # 0=Monday
     start_time = models.TimeField()
     end_time = models.TimeField()

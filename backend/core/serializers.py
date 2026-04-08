@@ -58,23 +58,30 @@ class ClassroomSerializer(serializers.ModelSerializer):
 
 class SubjectSerializer(serializers.ModelSerializer):
     classroom_name = serializers.ReadOnlyField(source='classroom.name')
-    instructor_name = serializers.ReadOnlyField(source='instructor.user.username')
+    instructor_names = serializers.SerializerMethodField()
     class Meta:
         model = Subject
         fields = '__all__'
+    
+    def get_instructor_names(self, obj):
+        return ", ".join([str(list(i.custom_data.values())[0]) if i.custom_data else str(i.registration_number) for i in obj.instructors.all()])
 
 class InstructorSerializer(serializers.ModelSerializer):
+    user_username = serializers.ReadOnlyField(source='user.username')
     class Meta:
         model = Instructor
         fields = '__all__'
+        read_only_fields = ('user',)
 
 class StudentSerializer(serializers.ModelSerializer):
     classroom_name = serializers.ReadOnlyField(source='classroom.name')
+    user_username = serializers.ReadOnlyField(source='user.username')
     generated_username = serializers.CharField(read_only=True, required=False)
     generated_password = serializers.CharField(read_only=True, required=False)
     class Meta:
         model = Student
         fields = '__all__'
+        read_only_fields = ('user',)
 
 class TimetableSerializer(serializers.ModelSerializer):
     class Meta:

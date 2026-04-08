@@ -1,8 +1,14 @@
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, permissions, status, serializers
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
 from .models import *
 from .serializers import *
+
+def get_query_param(request, key):
+    val = request.query_params.get(key)
+    if val in ['undefined', 'null', '']:
+        return None
+    return val
 
 class IsAdminUser(permissions.BasePermission):
     def has_permission(self, request, view):
@@ -16,7 +22,7 @@ class ClassroomViewSet(viewsets.ModelViewSet):
     serializer_class = ClassroomSerializer
     permission_classes = [permissions.IsAuthenticated]
     def get_queryset(self):
-        org = self.request.query_params.get('organization')
+        org = get_query_param(self.request, 'organization')
         qs = Classroom.objects.all()
         if org: qs = qs.filter(organization_id=org)
         return qs
@@ -33,8 +39,10 @@ class SubjectViewSet(viewsets.ModelViewSet):
             student = getattr(user, 'student_profile', None)
             if student and student.classroom:
                 return qs.filter(classroom=student.classroom)
-        org = self.request.query_params.get('organization')
+        org = get_query_param(self.request, 'organization')
         if org: qs = qs.filter(organization_id=org)
+        classroom = get_query_param(self.request, 'classroom')
+        if classroom: qs = qs.filter(classroom_id=classroom)
         return qs
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -78,6 +86,41 @@ class OrganizationViewSet(viewsets.ModelViewSet):
             return Response({'status': 'activated', 'plan': org.subscription_plan})
         return Response({'error': 'Invalid License Key'}, status=400)
 
+    @action(detail=False, methods=['GET'])
+    def mine(self, request):
+        user = request.user
+        if user.role == 'ADMIN':
+            org = Organization.objects.first()
+        else:
+            org = Organization.objects.filter(manager=user).first()
+            if not org:
+                # Fallback for students/instructors checking their org
+                if user.role == 'STUDENT' and hasattr(user, 'student_profile'):
+                    org = user.student_profile.organization
+                elif user.role == 'INSTRUCTOR' and hasattr(user, 'instructor_profile'):
+                    org = user.instructor_profile.organization
+        
+        if org:
+            return Response(self.get_serializer(org).data)
+        return Response({'error': 'No organization found'}, status=404)
+
+    def perform_destroy(self, instance):
+        # Disable the manager
+        if instance.manager:
+            instance.manager.is_active = False
+            instance.manager.save()
+        
+        # Disable all related users
+        for s in Student.objects.filter(organization=instance):
+            if s.user:
+                s.user.is_active = False
+                s.user.save()
+        for i in Instructor.objects.filter(organization=instance):
+            if i.user:
+                i.user.is_active = False
+                i.user.save()
+        instance.delete()
+
 class StudentViewSet(viewsets.ModelViewSet):
     serializer_class = StudentSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -85,7 +128,7 @@ class StudentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = Student.objects.all()
         if self.request.user.role == 'ADMIN':
-            org_id = self.request.query_params.get('organization')
+            org_id = get_query_param(self.request, 'organization')
             if org_id:
                 qs = qs.filter(organization_id=org_id)
             return qs
@@ -93,7 +136,10 @@ class StudentViewSet(viewsets.ModelViewSet):
         if self.request.user.role == 'MANAGER':
             org = getattr(self.request.user, 'managed_org', None)
             if org:
-                return qs.filter(organization=org)
+                qs = qs.filter(organization=org)
+                classroom = get_query_param(self.request, 'classroom')
+                if classroom: qs = qs.filter(classroom_id=classroom)
+                return qs
         
         return Student.objects.none()
 
@@ -166,20 +212,53 @@ class StudentViewSet(viewsets.ModelViewSet):
             )
         return Response({'message': 'Import successful'})
 
+    def perform_destroy(self, instance):
+        user = instance.user
+        instance.delete()
+        if user:
+            user.delete()
+            
 class TimetableViewSet(viewsets.ModelViewSet):
-    queryset = Timetable.objects.all()
     serializer_class = TimetableSerializer
     permission_classes = [permissions.IsAuthenticated]
+    def get_queryset(self):
+        qs = Timetable.objects.all()
+        classroom = get_query_param(self.request, 'classroom')
+        if classroom: qs = qs.filter(subject__classroom_id=classroom)
+        org = get_query_param(self.request, 'organization')
+        if org: qs = qs.filter(organization_id=org)
+        return qs
+    
+    def perform_create(self, serializer):
+        subject = serializer.validated_data['subject']
+        instructor = subject.instructor
+        day = serializer.validated_data['day_of_week']
+        start = serializer.validated_data['start_time']
+        
+        if instructor:
+           clashes = Timetable.objects.filter(subject__instructor=instructor, day_of_week=day, start_time=start)
+           if clashes.exists():
+              raise serializers.ValidationError({"error": f"Clash! Instructor is already in {clashes[0].subject.classroom.name} for {clashes[0].subject.name}."})
+        
+        serializer.save()
 
 class ClassSessionViewSet(viewsets.ModelViewSet):
-    queryset = ClassSession.objects.all()
     serializer_class = ClassSessionSerializer
     permission_classes = [permissions.IsAuthenticated]
+    def get_queryset(self):
+        qs = ClassSession.objects.all()
+        classroom = get_query_param(self.request, 'classroom')
+        if classroom: qs = qs.filter(timetable__subject__classroom_id=classroom)
+        return qs
 
 class HomeworkViewSet(viewsets.ModelViewSet):
-    queryset = Homework.objects.all()
     serializer_class = HomeworkSerializer
     permission_classes = [permissions.IsAuthenticated]
+    def get_queryset(self):
+        qs = Homework.objects.all()
+        classroom = get_query_param(self.request, 'classroom')
+        if classroom: qs = qs.filter(session__timetable__subject__classroom_id=classroom)
+        return qs
 
 class InstructorViewSet(viewsets.ModelViewSet):
     serializer_class = InstructorSerializer
@@ -188,7 +267,7 @@ class InstructorViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = Instructor.objects.all()
         if self.request.user.role == 'ADMIN':
-            org_id = self.request.query_params.get('organization')
+            org_id = get_query_param(self.request, 'organization')
             if org_id:
                 qs = qs.filter(organization_id=org_id)
             return qs
@@ -199,6 +278,12 @@ class InstructorViewSet(viewsets.ModelViewSet):
                 return qs.filter(organization=org)
         
         return Instructor.objects.none()
+
+    def perform_destroy(self, instance):
+        user = instance.user
+        instance.delete()
+        if user:
+            user.delete()
 
     def perform_create(self, serializer):
         user_data = self.request.data.get('user_data', {})

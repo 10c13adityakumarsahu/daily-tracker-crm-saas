@@ -48,7 +48,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login setToken={setToken} setRole={setRole} />} />
           <Route path="/signup" element={<Signup />} />
-          <Route path="/" element={token ? <Dashboard role={role} token={token} /> : <LandingPage />} />
+          <Route path="/" element={token ? <Dashboard role={role} token={token} logout={logout} /> : <LandingPage />} />
         </Routes>
       </main>
     </div>
@@ -142,9 +142,9 @@ function Login({ setToken, setRole }) {
   );
 }
 
-function Dashboard({ role, token }) {
-  if (role === 'ADMIN') return <AdminDashboard token={token} />;
-  if (role === 'MANAGER') return <ManagerDashboard token={token} />;
+function Dashboard({ role, token, logout }) {
+  if (role === 'ADMIN') return <AdminDashboard token={token} logout={logout} />;
+  if (role === 'MANAGER') return <ManagerDashboard token={token} logout={logout} />;
   if (role === 'INSTRUCTOR') return <div className="dashboard"><h2>Instructor Dashboard</h2><p>View your classes, upload materials, and update logs.</p></div>;
   if (role === 'PARENT') return <div className="dashboard"><h2>Parent Dashboard</h2><p>View your child's pending and completed homework.</p></div>;
   return <div>Loading Dashboard...</div>;
@@ -328,7 +328,7 @@ function AdminDashboard({ token }) {
   );
 }
 
-function ManagerDashboard({ token }) {
+function ManagerDashboard({ token, logout }) {
   const [org, setOrg] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [showAddStudent, setShowAddStudent] = useState(false);
@@ -341,18 +341,212 @@ function ManagerDashboard({ token }) {
   const [newFieldName, setNewFieldName] = useState('');
   const [newFieldType, setNewFieldType] = useState('text');
   const [activeSchema, setActiveSchema] = useState('student');
+  const [allTimetables, setAllTimetables] = useState([]);
   const [showPayment, setShowPayment] = useState(false);
   const [showActivateModal, setShowActivateModal] = useState(false);
   const [tempLicense, setTempLicense] = useState('');
   const [newFieldOptions, setNewFieldOptions] = useState('');
+  
+  const [selectedClassId, setSelectedClassId] = useState(null);
+  const [classDetails, setClassDetails] = useState({ subjects: [], students: [], timetable: [], sessions: [], homework: [] });
+  const [newSubject, setNewSubject] = useState({ name: '', instructor: '' });
+  const [courseSearch, setCourseSearch] = useState('');
+  const [classroomSearch, setClassroomSearch] = useState('');
+  const [studentSearch, setStudentSearch] = useState('');
+  const [instructorSearch, setInstructorSearch] = useState('');
+  const [newInterval, setNewInterval] = useState({ name: '', start: '', end: '' });
+
+  const [studentForm, setStudentForm] = useState({
+    classroom: '',
+    custom_data: {}
+  });
+  const [editingStudent, setEditingStudent] = useState(null);
+
+  const [instructorForm, setInstructorForm] = useState({
+    subjects: [],
+    custom_data: {}
+  });
+  const [editingInstructor, setEditingInstructor] = useState(null);
+
+  const handleCreateOrUpdateStudent = async (e) => {
+    e.preventDefault();
+    const isUpdate = !!editingStudent;
+    const url = isUpdate ? `${API_BASE_URL}/api/students/${editingStudent.id}/` : `${API_BASE_URL}/api/students/`;
+    const method = isUpdate ? 'PATCH' : 'POST';
+    
+    // Map first field for backend identity if it's a new record
+    const firstFieldVal = Object.values(studentForm.custom_data)[0] || 'Student';
+    const regNoFieldVal = studentForm.custom_data['Registration ID'] || studentForm.custom_data['ID'] || Math.floor(Math.random() * 10000);
+    
+    const payload = isUpdate ? studentForm : {
+      ...studentForm, 
+      organization: org.id,
+      first_name: firstFieldVal,
+      registration_number: regNoFieldVal
+    };
+
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify(payload)
+    });
+    
+    if (res.ok) {
+      alert(isUpdate ? 'Record updated!' : 'Record created!');
+      setShowAddStudent(false);
+      setEditingStudent(null);
+      setStudentForm({ classroom: '', custom_data: {} });
+      fetchItems();
+      if (selectedClassId) fetchClassroomDetails(selectedClassId);
+    } else {
+      alert('Failed to save record. Please check individual field constraints.');
+    }
+  };
+
+  const handleCreateOrUpdateInstructor = async (e) => {
+    e.preventDefault();
+    const isUpdate = !!editingInstructor;
+    const url = isUpdate ? `${API_BASE_URL}/api/instructors/${editingInstructor.id}/` : `${API_BASE_URL}/api/instructors/`;
+    const method = isUpdate ? 'PATCH' : 'POST';
+    
+    const firstFieldVal = Object.values(instructorForm.custom_data)[0] || 'Instructor';
+    const regNoFieldVal = instructorForm.custom_data['Instructor ID'] || Math.floor(Math.random() * 10000);
+
+    const payload = isUpdate ? {
+      ...instructorForm,
+      registration_number: regNoFieldVal,
+      organization: org.id
+    } : { 
+      ...instructorForm, 
+      organization: org.id,
+      first_name: firstFieldVal,
+      registration_number: regNoFieldVal,
+      user_data: {
+         username: `inst_${regNoFieldVal}`,
+         password: `Pass@${regNoFieldVal}`
+      }
+    };
+
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      const instructorObj = await res.json();
+      
+      // Handle subject associations
+      // For updates, we first clear then re-assign or handle diff?
+      // Let's just PATCH all selected subjects to this instructor.
+      if (instructorForm.subjects.length > 0) {
+         await Promise.all(instructorForm.subjects.map(sid => 
+            fetch(`${API_BASE_URL}/api/subjects/${sid}/`, {
+               method: 'PATCH',
+               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+               body: JSON.stringify({ instructor: instructorObj.id })
+            })
+         ));
+      }
+      
+      alert(isUpdate ? 'Instructor updated successfully!' : 'Instructor created successfully!');
+      setShowAddInstructor(false);
+      setEditingInstructor(null);
+      setInstructorForm({ subjects: [], custom_data: {} });
+      fetchItems();
+    } else {
+      alert('Failed to save instructor data');
+    }
+  };
 
   const fetchItems = () => {
-    fetch(`${API_BASE_URL}/api/organizations/`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()).then(data => { if (data.length > 0) setOrg(data[0]); });
-    fetch(`${API_BASE_URL}/api/students/`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()).then(setStudents);
-    fetch(`${API_BASE_URL}/api/instructors/`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()).then(setInstructors);
-    fetch(`${API_BASE_URL}/api/classrooms/`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()).then(setClassrooms);
-    fetch(`${API_BASE_URL}/api/subjects/`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()).then(setSubjects);
+    fetch(`${API_BASE_URL}/api/organizations/mine/`, { headers: { 'Authorization': `Bearer ${token}` } })
+      .then(res => { if (res.status === 401) { logout(); return; } return res.json(); })
+      .then(data => data && data.id && setOrg(data));
+
+    fetch(`${API_BASE_URL}/api/students/`, { headers: { 'Authorization': `Bearer ${token}` } })
+      .then(res => { if (res.status === 401) { logout(); return; } return res.json(); })
+      .then(data => data && setStudents(data));
+
+    fetch(`${API_BASE_URL}/api/instructors/`, { headers: { 'Authorization': `Bearer ${token}` } })
+      .then(res => { if (res.status === 401) { logout(); return; } return res.json(); })
+      .then(data => data && setInstructors(data));
+
+    fetch(`${API_BASE_URL}/api/classrooms/`, { headers: { 'Authorization': `Bearer ${token}` } })
+      .then(res => { if (res.status === 401) { logout(); return; } return res.json(); })
+      .then(data => data && setClassrooms(data));
+
+    fetch(`${API_BASE_URL}/api/subjects/`, { headers: { 'Authorization': `Bearer ${token}` } })
+      .then(res => { if (res.status === 401) { logout(); return; } return res.json(); })
+      .then(data => data && setSubjects(data));
+
+    fetch(`${API_BASE_URL}/api/timetables/`, { headers: { 'Authorization': `Bearer ${token}` } })
+      .then(res => { if (res.status === 401) { logout(); return; } return res.json(); })
+      .then(data => data && setAllTimetables(data));
   };
+
+  const fetchClassroomDetails = async (cid) => {
+    if (!cid || cid === 'undefined') return;
+    const [subRes, stuRes, ttRes, sesRes, hwRes] = await Promise.all([
+      fetch(`${API_BASE_URL}/api/subjects/?classroom=${cid}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
+      fetch(`${API_BASE_URL}/api/students/?classroom=${cid}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
+      fetch(`${API_BASE_URL}/api/timetables/?classroom=${cid}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
+      fetch(`${API_BASE_URL}/api/class-sessions/?classroom=${cid}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
+      fetch(`${API_BASE_URL}/api/homeworks/?classroom=${cid}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
+    ]);
+    setClassDetails({ subjects: subRes, students: stuRes, timetable: ttRes, sessions: sesRes, homework: hwRes });
+  }
+
+  const fetchMasterData = async () => {
+    if (!org || !org.id) return;
+    const res = await fetch(`${API_BASE_URL}/api/timetables/?organization=${org.id}`, { headers: { 'Authorization': `Bearer ${token}` } });
+    if (res.ok) setAllTimetables(await res.json());
+  }
+
+  const generateSlots = () => {
+    if (!org) return [];
+    const slots = [];
+    const [sh, sm] = (org.school_start_time || '08:30:00').split(':').map(Number);
+    const [eh, em] = (org.school_end_time || '15:30:00').split(':').map(Number);
+    let currentMins = sh * 60 + sm;
+    const endMins = eh * 60 + em;
+    
+    const custom = (org.custom_intervals || []).map(ci => ({
+       ...ci,
+       startMins: parseInt(ci.start.split(':')[0]) * 60 + parseInt(ci.start.split(':')[1]),
+       endMins: parseInt(ci.end.split(':')[0]) * 60 + parseInt(ci.end.split(':')[1]),
+    })).sort((a,b) => a.startMins - b.startMins);
+
+    let pNum = 1;
+    let guard = 0;
+    while (currentMins < endMins && guard < 100) {
+      guard++;
+      const currentTimeStr = `${String(Math.floor(currentMins/60)).padStart(2,'0')}:${String(currentMins%60).padStart(2,'0')}`;
+      const matchingCI = custom.find(ci => ci.start === currentTimeStr);
+      
+      if (matchingCI) {
+         slots.push({ type: 'BREAK', label: matchingCI.name.toUpperCase(), start: matchingCI.start + ':00', end: matchingCI.end + ':00' });
+         currentMins = matchingCI.endMins;
+      } else {
+         const sStr = currentTimeStr + ':00';
+         const periodEnd = currentMins + (org.period_duration_minutes || 45);
+         if (periodEnd > endMins) break;
+         const eStr = `${String(Math.floor(periodEnd/60)).padStart(2,'0')}:${String(periodEnd%60).padStart(2,'0')}:00`;
+         slots.push({ type: 'PERIOD', label: `P${pNum++}`, start: sStr, end: eStr });
+         currentMins = periodEnd;
+
+         if (custom.length === 0 && pNum - 1 === (org.break_after_period || 3)) {
+            const bs = eStr;
+            currentMins += (org.break_duration_minutes || 15);
+            const be = `${String(Math.floor(currentMins/60)).padStart(2,'0')}:${String(currentMins%60).padStart(2,'0')}:00`;
+            slots.push({ type: 'BREAK', label: 'BREAK', start: bs, end: be });
+         }
+      }
+    }
+    return slots;
+  };
+
+  useEffect(() => { if (selectedClassId) fetchClassroomDetails(selectedClassId); }, [selectedClassId]);
+  useEffect(() => { if (activeTab === 'master') fetchMasterData(); }, [activeTab]);
 
   useEffect(() => { fetchItems(); }, [token]);
 
@@ -432,13 +626,44 @@ function ManagerDashboard({ token }) {
   }
 
   const handleAddClassroom = async () => {
-    await fetch(`${API_BASE_URL}/api/classrooms/`, {
+    if (!newClassroom) return alert("Please enter a classroom name.");
+    const res = await fetch(`${API_BASE_URL}/api/classrooms/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({ name: newClassroom, organization: org.id })
     });
-    setNewClassroom(''); fetchItems();
+    if (res.ok) {
+       setNewClassroom(''); fetchItems();
+    } else {
+       alert("Failed to create classroom.");
+    }
   };
+
+  const handleAddSubject = async () => {
+    // If name is selected from bank (it's actually an ID in our new UI)
+    const bankSubjectId = newSubject.id;
+    if (!bankSubjectId) return alert("Please select a course from the bank.");
+    
+    const payload = { 
+      classroom: selectedClassId, 
+      instructor: newSubject.instructor || null 
+    };
+
+    const res = await fetch(`${API_BASE_URL}/api/subjects/${bankSubjectId}/`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+       setNewSubject({ id: '', instructor: '' });
+       fetchItems(); // Update universal bank
+       fetchClassroomDetails(selectedClassId); // Update local view
+       alert("Course assigned to classroom!");
+    } else {
+       const err = await res.json();
+       alert("Failed to assign course: " + (err.error || JSON.stringify(err)));
+    }
+  }
 
   const getDaysLeft = () => {
     if (!org || !org.subscription_expiry) return null;
@@ -454,12 +679,12 @@ function ManagerDashboard({ token }) {
   return (
     <div className="dashboard-container" style={{display: 'flex', minHeight: '100vh'}}>
       {/* SaaS Sidebar */}
-      <div className="sidebar" style={{width: '280px', background: 'rgba(255,255,255,0.03)', borderRight: '1px solid var(--border-color)', padding: '2rem 1.5rem', display: 'flex', flexDirection: 'column'}}>
+          <div className="sidebar" style={{width: '280px', background: 'rgba(255,255,255,0.03)', borderRight: '1px solid var(--border-color)', padding: '2rem 1.5rem', display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh'}}>
         {org && (
           <div style={{marginBottom: '2.5rem'}}>
              <h2 style={{fontSize: '1.5rem', marginBottom: '0.5rem'}}>{org.name}</h2>
              <div style={{display: 'flex', gap: '0.5rem', alignItems: 'center'}}>
-                <span className="badge" style={{background: org.subscription_plan === 'TRIAL' ? 'rgba(255,165,0,0.1)' : 'rgba(16,185,129,0.1)', color: org.subscription_plan === 'TRIAL' ? 'orange' : '#10B981'}}>
+                <span className="badge" style={{background: org.subscription_plan === 'FREE' ? 'rgba(255,165,0,0.1)' : 'rgba(16,185,129,0.1)', color: org.subscription_plan === 'FREE' ? 'orange' : '#10B981'}}>
                    {org.subscription_plan}
                 </span>
                 {org.has_portal_access && daysLeft !== null && (
@@ -470,34 +695,40 @@ function ManagerDashboard({ token }) {
         )}
 
         <nav style={{display: 'flex', flexDirection: 'column', gap: '0.8rem', flex: 1}}>
-          {['overview', 'schemas', 'classrooms', 'instructors', 'students', 'profile'].map(tab => (
+          {[
+            {id: 'overview', icon: 'home', label: 'Overview'},
+            {id: 'schemas', icon: 'layer-group', label: 'Schemas'},
+            {id: 'master', icon: 'th-list', label: 'Master Schedule'},
+            {id: 'classrooms', icon: 'school', label: 'Classrooms Hub'},
+            {id: 'subjects', icon: 'book', label: 'Course Bank'},
+            {id: 'instructors', icon: 'user-tie', label: 'Staff Roster'},
+            {id: 'students', icon: 'user-graduate', label: 'Student Body'},
+            {id: 'profile', icon: 'cog', label: 'School Settings'}
+          ].map(tab => (
             <button 
-              key={tab} 
-              onClick={() => setActiveTab(tab)} 
-              className={activeTab === tab ? 'btn-primary' : 'btn-logout'} 
+              key={tab.id} 
+              onClick={() => { setActiveTab(tab.id); setSelectedClassId(null); }} 
+              className={activeTab === tab.id ? 'btn-primary' : 'btn-logout'} 
               style={{justifyContent: 'flex-start', textAlign: 'left', padding: '0.8rem 1.2rem'}}
             >
-              <i className={`fas fa-${tab === 'overview' ? 'home' : (tab === 'schemas' ? 'layer-group' : (tab === 'classrooms' ? 'school' : (tab === 'instructors' ? 'chalkboard-teacher' : (tab === 'students' ? 'user-graduate' : 'id-card'))))}`} style={{marginRight: '10px', width: '20px'}}></i>
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              <i className={`fas fa-${tab.icon}`} style={{marginRight: '10px', width: '20px'}}></i>
+              {tab.label}
             </button>
           ))}
         </nav>
 
         {org && (
           <div style={{marginTop: '2rem', padding: '1.5rem', background: 'linear-gradient(135deg, rgba(192,132,252,0.1), rgba(236,72,153,0.1))', borderRadius: '16px', border: '1px solid rgba(192,132,252,0.2)'}}>
-             <h4 style={{margin: 0, fontSize: '0.9rem'}}>{org.subscription_plan === 'TRIAL' ? 'Enterprise Upgrade' : 'Active Subscription'}</h4>
+             <h4 style={{margin: 0, fontSize: '0.9rem'}}>{org.subscription_plan === 'FREE' ? 'Upgrade Plan' : 'Active Plan'}</h4>
              <p style={{fontSize: '0.75rem', opacity: 0.7, margin: '0.5rem 0 1rem 0'}}>
-                {org.subscription_plan === 'TRIAL' 
-                  ? 'Unlock unlimited students and custom schemas.' 
-                  : `Expiring on ${new Date(org.subscription_expiry).toLocaleDateString()}`}
+                Manage all institutional units with premium access.
              </p>
-             {daysLeft !== null && <div style={{fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--primary-color)', marginBottom: '0.8rem'}}>{daysLeft} Days Remaining</div>}
              <button 
                 onClick={() => setShowActivateModal(true)} 
-                className="btn-primary" 
+                className={org.is_payment_verified ? "btn-logout" : "btn-primary"} 
                 style={{width: '100%', fontSize: '0.8rem', padding: '0.6rem'}}
              >
-                {org.subscription_plan === 'TRIAL' ? 'Activate License Key' : 'Renew / Activate Key'}
+                {org.subscription_plan === 'FREE' ? (org.is_payment_verified ? 'Activation Pending' : 'Activate License') : 'Renew License'}
              </button>
           </div>
         )}
@@ -575,6 +806,434 @@ function ManagerDashboard({ token }) {
         </div>
       )}
 
+      {activeTab === 'overview' && org && (
+        <div className="animate-fadeIn">
+          <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '2.5rem'}}>
+             <div>
+                <h2 style={{fontSize: '2.25rem'}}>Dashboard <span className="nav-brand" style={{fontSize: '2.25rem'}}>Overview</span></h2>
+                <p style={{color: 'var(--text-muted)'}}>High-level metrics and system status for <strong>{org.name}</strong>.</p>
+             </div>
+          </div>
+
+          <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', marginBottom: '3rem'}}>
+             <div className="dashboard-card" style={{border: '1px solid var(--border-color)'}}>
+                <div style={{opacity: 0.6, fontSize: '0.8rem', marginBottom: '0.5rem'}}>TOTAL STUDENTS</div>
+                <div style={{fontSize: '2rem', fontWeight: 'bold'}}>{students.length}</div>
+             </div>
+             <div className="dashboard-card" style={{border: '1px solid var(--border-color)'}}>
+                <div style={{opacity: 0.6, fontSize: '0.8rem', marginBottom: '0.5rem'}}>STAFF MEMBERS</div>
+                <div style={{fontSize: '2rem', fontWeight: 'bold'}}>{instructors.length}</div>
+             </div>
+             <div className="dashboard-card" style={{border: '1px solid var(--border-color)'}}>
+                <div style={{opacity: 0.6, fontSize: '0.8rem', marginBottom: '0.5rem'}}>ACTIVE CLASSES</div>
+                <div style={{fontSize: '2rem', fontWeight: 'bold'}}>{classrooms.length}</div>
+             </div>
+             <div className="dashboard-card" style={{border: '1px solid var(--border-color)'}}>
+                <div style={{opacity: 0.6, fontSize: '0.8rem', marginBottom: '0.5rem'}}>PORTAL STATUS</div>
+                <div className={`badge ${org.has_portal_access ? 'badge-success' : 'badge-warning'}`} style={{fontSize: '1rem', marginTop: '0.5rem'}}>{org.has_portal_access ? 'ACCEPTS LOGINS' : 'READ ONLY'}</div>
+             </div>
+          </div>
+
+          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem'}}>
+             <div className="dashboard-card">
+                <h3>Subscription Metadata</h3>
+                <div className="info-grid" style={{marginTop: '1.5rem'}}>
+                   <div style={{display: 'flex', justifyContent: 'space-between', padding: '0.8rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)'}}><span>Plan:</span> <strong>{org.subscription_plan}</strong></div>
+                   <div style={{display: 'flex', justifyContent: 'space-between', padding: '0.8rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)'}}><span>License Status:</span> <strong>{org.is_license_generated ? 'ISSUED' : 'PENDING'}</strong></div>
+                   <div style={{display: 'flex', justifyContent: 'space-between', padding: '0.8rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)'}}><span>Expiration:</span> <strong>{org.subscription_expiry ? new Date(org.subscription_expiry).toLocaleDateString() : 'N/A'}</strong></div>
+                   <div style={{display: 'flex', justifyContent: 'space-between', padding: '0.8rem 0'}}><span>Support Tier:</span> <strong style={{color: 'var(--primary-color)'}}>PRIORITY</strong></div>
+                </div>
+             </div>
+             <div className="dashboard-card" style={{background: 'rgba(192,132,252,0.03)', border: '1px dashed rgba(192,132,252,0.2)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center'}}>
+                <i className="fas fa-rocket" style={{fontSize: '2.5rem', marginBottom: '1rem', opacity: 0.3}}></i>
+                <h4>Scalability Actions</h4>
+                <p style={{fontSize: '0.85rem', opacity: 0.6}}>Bulk import or export your student data using our CSV engine.</p>
+                <div style={{display: 'flex', gap: '1rem', marginTop: '1.5rem'}}>
+                   <button className="btn-secondary" onClick={() => setActiveTab('students')}>Go to Student CRM</button>
+                </div>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'master' && org && (
+        <div className="animate-fadeIn">
+          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'end', marginBottom: '2.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1.5rem'}}>
+             <div>
+                <h2 style={{fontSize: '2.4rem', fontWeight: 900, letterSpacing: '-1.5px', marginBottom: '0.4rem'}}>Universal <span className="nav-brand" style={{fontSize: '2.4rem'}}>Master Schedule</span></h2>
+                <p style={{color: 'var(--text-muted)', fontSize: '1.1rem'}}>Institutional control center for all academic assignments.</p>
+             </div>
+             
+             <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.8rem'}}>
+                <div style={{display: 'flex', gap: '0.5rem'}}>
+                   {['Mon','Tue','Wed','Thu','Fri'].map(d => (
+                     <div key={d} className="badge" style={{background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', cursor: 'not-allowed'}}>{d}</div>
+                   ))}
+                </div>
+                <div style={{background: 'rgba(255,255,255,0.03)', padding: '0.6rem 1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', gap: '1rem', alignItems: 'center'}}>
+                    <span style={{fontSize: '0.75rem', fontWeight: 800, opacity: 0.4}}>DP-DRAG BANK:</span>
+                    <div style={{display: 'flex', gap: '0.6rem'}}>
+                        {subjects.filter(s => s.instructor).slice(0, 4).map(s => (
+                           <div key={s.id} draggable onDragStart={(e) => e.dataTransfer.setData('subjectId', s.id)} style={{padding: '0.4rem 0.8rem', background: 'var(--primary-color)', fontSize: '0.75rem', borderRadius: '6px', fontWeight: 'bold', cursor: 'grab', boxShadow: '0 4px 12px rgba(0,0,0,0.2)'}}>
+                              {s.name}
+                           </div>
+                        ))}
+                        {subjects.filter(s => s.instructor).length > 4 && <span style={{opacity: 0.3, fontSize: '0.7rem'}}>+{subjects.filter(s => s.instructor).length - 4} more</span>}
+                    </div>
+                </div>
+             </div>
+          </div>
+
+          <div className="dashboard-card" style={{padding: '0', background: 'transparent', boxShadow: 'none'}}>
+            <div style={{overflowX: 'auto', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)'}}>
+               <div style={{minWidth: '1200px', display: 'grid', gridTemplateColumns: `140px repeat(${classrooms.length}, 1fr)`, gap: '1px', background: 'rgba(255,255,255,0.05)'}}>
+                  <div style={{padding: '1.5rem', background: 'var(--background-card)', fontWeight: 900, color: 'var(--primary-color)', fontSize: '0.8rem', letterSpacing: '1px'}}>TIME SLOTS</div>
+                  {classrooms.map(c => (
+                    <div key={c.id} style={{padding: '1.5rem', background: 'var(--background-card)', textAlign: 'center', fontWeight: 'bold', borderBottom: '2px solid rgba(192,132,252,0.3)', color: 'white', position: 'relative'}}>
+                       <i className="fas fa-desktop" style={{position: 'absolute', left: '1.5rem', opacity: 0.1, fontSize: '2rem'}}></i>
+                       {c.name}
+                    </div>
+                  ))}
+
+                  {generateSlots().map((slot, sIdx) => {
+                    const isBreak = slot.type === 'BREAK';
+                    return (
+                    <React.Fragment key={sIdx}>
+                       <div style={{padding: '1.5rem', background: isBreak ? 'linear-gradient(to right, rgba(192,132,252,0.05), transparent)' : 'var(--background-card)', borderRight: '1px solid rgba(255,255,255,0.03)', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+                          <div style={{fontSize: '1rem', fontWeight: 900, color: isBreak ? 'var(--primary-color)' : 'white'}}>{slot.label}</div>
+                          <div style={{fontSize: '0.75rem', opacity: 0.4}}>{slot.start.slice(0,5)} - {slot.end.slice(0,5)}</div>
+                       </div>
+                       {classrooms.map(c => {
+                          const entry = allTimetables.find(t => t.start_time === slot.start && subjects.find(sub => sub.id === t.subject)?.classroom === c.id);
+                          const subj = entry ? subjects.find(s => s.id === entry.subject) : null;
+                          const teacher = subj ? instructors.find(i => i.id === subj.instructor) : null;
+
+                          return (
+                            <div 
+                               key={c.id} 
+                               onDragOver={e => e.preventDefault()}
+                               onDrop={async (e) => {
+                                  const sid = e.dataTransfer.getData('subjectId');
+                                  const res = await fetch(`${API_BASE_URL}/api/timetables/`, {
+                                     method: 'POST',
+                                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                     body: JSON.stringify({ organization: org.id, subject: sid, day_of_week: 0, start_time: slot.start, end_time: slot.end })
+                                  });
+                                  if (res.ok) fetchMasterData();
+                                  else { const err = await res.json(); alert(err.error || "Conflict detected."); }
+                               }}
+                               style={{padding: '1rem', minHeight: '120px', background: isBreak ? 'rgba(255,255,255,0.02)' : 'var(--background-card)', transition: 'all 0.3s ease', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative'}}
+                            >
+                               {isBreak ? (
+                                 <div style={{fontSize: '0.7rem', opacity: 0.1, fontWeight: 900, letterSpacing: '4px', textTransform: 'uppercase'}}>Rest Interval</div>
+                               ) : (
+                                 subj ? (
+                                   <div style={{textAlign: 'center', width: '100%', padding: '1rem', background: 'linear-gradient(135deg, rgba(192,132,252,0.15), rgba(236,72,153,0.15))', border: '1px solid var(--primary-color)', borderRadius: '12px', boxShadow: '0 8px 24px rgba(192,132,252,0.2)', cursor: 'default'}}>
+                                      <div style={{fontSize: '0.9rem', fontWeight: 900, color: 'white', marginBottom: '0.3rem'}}>{subj.name}</div>
+                                      <div style={{fontSize: '0.75rem', opacity: 0.7, fontStyle: 'italic'}}>{Object.values(teacher?.custom_data || {})[0] || teacher?.registration_number || 'Unnamed Staff'}</div>
+                                      <button 
+                                        onClick={async () => {
+                                           if (!window.confirm("Remove session?")) return;
+                                           await fetch(`${API_BASE_URL}/api/timetables/${entry.id}/`, {
+                                              method: 'DELETE',
+                                              headers: { 'Authorization': `Bearer ${token}` }
+                                           });
+                                           fetchMasterData();
+                                        }}
+                                        style={{position: 'absolute', top: '0.5rem', right: '0.5rem', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.2)', cursor: 'pointer', fontSize: '0.6rem'}}
+                                      >
+                                        <i className="fas fa-times"></i>
+                                      </button>
+                                   </div>
+                                 ) : (
+                                   <div style={{opacity: 0.05, fontSize: '2rem', fontWeight: 100}}>+</div>
+                                 )
+                               )}
+                            </div>
+                          );
+                       })}
+                    </React.Fragment>
+                  )})}
+               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'subjects' && org && (
+        <div className="animate-fadeIn">
+           <div className="dashboard-card" style={{marginBottom: '2rem'}}>
+              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem'}}>
+                <div>
+                   <h3>Subject Discovery Bank</h3>
+                   <p style={{opacity: 0.6}}>Create and manage universal course assets.</p>
+                </div>
+                <div className="search-container" style={{maxWidth: '400px'}}>
+                   <i className="fas fa-search"></i>
+                   <input 
+                      placeholder="Search Courses..." 
+                      value={courseSearch} 
+                      onChange={e => setCourseSearch(e.target.value)} 
+                   />
+                </div>
+              </div>
+              <div style={{display: 'flex', gap: '1rem'}}>
+                 <input value={newSubject.name} onChange={e => setNewSubject({...newSubject, name: e.target.value})} placeholder="e.g. Mathematics II" style={{flex: 1}} />
+                 <button onClick={async () => {
+                    if (!newSubject.name) return;
+                    await fetch(`${API_BASE_URL}/api/subjects/`, {
+                       method: 'POST',
+                       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                       body: JSON.stringify({ name: newSubject.name, organization: org.id })
+                    });
+                    setNewSubject({...newSubject, name: ''}); fetchItems();
+                 }} className="btn-primary">Create Universal Subject</button>
+              </div>
+           </div>
+
+           <div className="dashboard-card">
+              <div style={{maxHeight: '60vh', overflowY: 'auto'}}>
+                 <table style={{width: '100%', textAlign: 'left', borderCollapse: 'separate', borderSpacing: '0 0.5rem'}}>
+                    <thead><tr style={{opacity: 0.5}}><th style={{padding: '0 1.2rem'}}>Course Name</th><th style={{padding: '0 1.2rem'}}>Target Unit</th><th style={{padding: '0 1.2rem'}}>Faculty Lead</th><th style={{textAlign: 'right', padding: '0 1.2rem'}}>Admin</th></tr></thead>
+                    <tbody>
+                       {subjects.filter(s => s.name.toLowerCase().includes(courseSearch.toLowerCase())).map(s => (
+                          <tr key={s.id} style={{background: 'rgba(255,255,255,0.02)', borderRadius: '12px'}}>
+                             <td style={{padding: '1.2rem', borderRadius: '12px 0 0 12px'}}>{s.name}</td>
+                             <td style={{padding: '1.2rem'}}>
+                                <select 
+                                   style={{padding: '0.5rem 1rem', width: '100%', fontSize: '0.9rem'}}
+                                   value={s.classroom || ''} 
+                                   onChange={async (e) => {
+                                   await fetch(`${API_BASE_URL}/api/subjects/${s.id}/`, {
+                                      method: 'PATCH',
+                                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                      body: JSON.stringify({ classroom: e.target.value || null })
+                                   });
+                                   fetchItems();
+                                }}>
+                                   <option value="">Bank (Unassigned)</option>
+                                   {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                </select>
+                             </td>
+                             <td style={{padding: '1.2rem'}}>
+                                <select 
+                                   style={{padding: '0.5rem 1rem', width: '100%', fontSize: '0.9rem'}}
+                                   value={s.instructor || ''} 
+                                   onChange={async (e) => {
+                                   await fetch(`${API_BASE_URL}/api/subjects/${s.id}/`, {
+                                      method: 'PATCH',
+                                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                      body: JSON.stringify({ instructor: e.target.value || null })
+                                   });
+                                   fetchItems();
+                                }}>
+                                   <option value="">Recruiting...</option>
+                                   {instructors.map(i => <option key={i.id} value={i.id}>{Object.values(i.custom_data)[0] || i.registration_number}</option>)}
+                                </select>
+                             </td>
+                             <td style={{textAlign: 'right', padding: '1.2rem', borderRadius: '0 12px 12px 0'}}>
+                                <button onClick={async () => {
+                                   if(!window.confirm("Permanently delete course?")) return;
+                                   await fetch(`${API_BASE_URL}/api/subjects/${s.id}/`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                                   fetchItems();
+                                }} style={{background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)', padding: '0.6rem 0.8rem', borderRadius: '8px'}}><i className="fas fa-trash-alt"></i></button>
+                             </td>
+                          </tr>
+                       ))}
+                    </tbody>
+                 </table>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {activeTab === 'classrooms' && org && (
+        <div className="animate-fadeIn">
+          {selectedClassId ? (
+            <div>
+               <div style={{display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem'}}>
+                  <button onClick={() => setSelectedClassId(null)} className="btn-logout" style={{padding: '0.4rem 0.8rem'}}><i className="fas fa-chevron-left"></i></button>
+                  <h2 style={{margin: 0}}>{classrooms.find(c => c.id === selectedClassId)?.name} <span className="nav-brand" style={{fontSize: '1rem', marginLeft: '1rem'}}>Institutional Hub</span></h2>
+               </div>
+
+               <div style={{display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 3fr', gap: '2rem'}}>
+                  {/* Left Column: People & Metadata */}
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
+                      <div className="dashboard-card">
+                         <h4>Subjects & Instructors</h4>
+                         <p style={{fontSize: '0.75rem', opacity: 0.5, marginBottom: '1rem'}}>Drag subjects into the grid to schedule them.</p>
+                         <div style={{display: 'flex', flexDirection: 'column', gap: '0.8rem'}}>
+                            {classDetails.subjects.map(s => (
+                               <div 
+                                  key={s.id} 
+                                  draggable 
+                                  onDragStart={(e) => e.dataTransfer.setData('subjectId', s.id)}
+                                  style={{padding: '0.8rem', background: 'var(--primary-color)', opacity: 0.8, borderRadius: '8px', cursor: 'grab'}}
+                               >
+                                  <div style={{fontWeight: 'bold', fontSize: '0.9rem'}}>{s.name}</div>
+                                  <div style={{fontSize: '0.75rem', opacity: 0.6}}>Staff: {instructors.find(i => i.id === s.instructor)?.registration_number || 'None'}</div>
+                               </div>
+                            ))}
+                            <div style={{borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem', marginTop: '0.5rem'}}>
+                               <label style={{fontSize: '0.75rem', display: 'block', marginBottom: '0.4rem'}}>Assign Course from Bank</label>
+                                <div style={{display: 'flex', gap: '0.5rem'}}>
+                                   <select value={newSubject.id || ""} onChange={e => setNewSubject({...newSubject, id: e.target.value})} style={{fontSize: '0.8rem', flex: 1}}>
+                                      <option value="">Select Course...</option>
+                                      {subjects.filter(s => !s.classroom).map(s => (
+                                         <option key={s.id} value={s.id}>{s.name}</option>
+                                      ))}
+                                   </select>
+                                  <select value={newSubject.instructor} onChange={e => setNewSubject({...newSubject, instructor: e.target.value})} style={{fontSize: '0.8rem', width: '100px'}}>
+                                     <option value="">Select Staff</option>
+                                     {instructors.map(i => <option key={i.id} value={i.id}>{Object.values(i.custom_data)[0] || i.registration_number}</option>)}
+                                  </select>
+                                  <button onClick={handleAddSubject} style={{background: 'var(--secondary-color)', border: 'none', color: 'white', padding: '0.4rem 0.6rem', borderRadius: '4px'}}><i className="fas fa-plus"></i></button>
+                               </div>
+                            </div>
+                         </div>
+                      </div>
+
+                      <div className="dashboard-card">
+                         <h4>Enrolled Students ({classDetails.students.length})</h4>
+                         <div style={{maxHeight: '300px', overflowY: 'auto', marginTop: '1rem'}}>
+                            {classDetails.students.map(stu => (
+                               <div key={stu.id} style={{padding: '0.6rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '0.85rem'}}>
+                                  {Object.values(stu.custom_data)[0] || 'Unknown Record'}
+                               </div>
+                            ))}
+                         </div>
+                      </div>
+                  </div>
+
+                  {/* Right Column: Interactive Timetable */}
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
+                      <div className="dashboard-card" style={{padding: '0'}}>
+                         <div style={{padding: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                            <h4>Interactive Timetable Planner</h4>
+                            <div className="badge badge-success">Drag & Drop Ready</div>
+                         </div>
+                         <div style={{padding: '1.5rem', overflowX: 'auto'}}>
+                            <div style={{display: 'grid', gridTemplateColumns: '80px repeat(5, 1fr)', gap: '1px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.05)'}}>
+                               <div style={{padding: '1rem', background: 'var(--background-card)'}}></div>
+                               {['Mon','Tue','Wed','Thu','Fri'].map(d => <div key={d} style={{padding: '1rem', background: 'var(--background-card)', textAlign: 'center', fontWeight: 'bold', fontSize: '0.8rem'}}>{d}</div>)}
+                               
+                               {[1, 2, 3, 4, 5].map(period => (
+                                 <React.Fragment key={period}>
+                                    <div style={{padding: '1rem', background: 'var(--background-card)', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.5}}>P {period}</div>
+                                    {[0, 1, 2, 3, 4].map(day => {
+                                       const entry = classDetails.timetable.find(t => t.day_of_week === day && t.start_time === `${period+7}:00:00`);
+                                       const subject = entry ? classDetails.subjects.find(s => s.id === entry.subject) : null;
+                                       return (
+                                          <div 
+                                             key={`${day}-${period}`} 
+                                             onDragOver={(e) => e.preventDefault()}
+                                             onDrop={async (e) => {
+                                                const sid = e.dataTransfer.getData('subjectId');
+                                                const res = await fetch(`${API_BASE_URL}/api/timetables/`, {
+                                                   method: 'POST',
+                                                   headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                                   body: JSON.stringify({ 
+                                                      organization: org.id, 
+                                                      subject: sid, 
+                                                      day_of_week: day, 
+                                                      start_time: `${period+7}:00:00`, 
+                                                      end_time: `${period+8}:00:00` 
+                                                   })
+                                                });
+                                                if (res.ok) {
+                                                   fetchClassroomDetails(selectedClassId);
+                                                } else {
+                                                   const err = await res.json();
+                                                   alert(err.error || "Clash detected or assignment failed.");
+                                                }
+                                             }}
+                                             style={{padding: '1rem', height: '80px', background: entry ? 'rgba(192,132,252,0.1)' : 'var(--background-card)', border: entry ? '1px solid var(--primary-color)' : 'none', position: 'relative'}}
+                                          >
+                                             {subject && (
+                                                <div style={{fontSize: '0.75rem', fontWeight: 'bold'}}>
+                                                   {subject.name}
+                                                   <div style={{fontSize: '0.65rem', opacity: 0.5}}>{instructors.find(i => i.id === subject.instructor)?.registration_number}</div>
+                                                </div>
+                                             )}
+                                          </div>
+                                       );
+                                    })}
+                                 </React.Fragment>
+                               ))}
+                            </div>
+                         </div>
+                      </div>
+
+                      <div className="dashboard-card" style={{flex: 1}}>
+                         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem'}}>
+                            <h4>Academic Progress & Homework</h4>
+                            <div className="badge">LIVE UPDATES</div>
+                         </div>
+                         <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
+                            <div style={{background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.1)', padding: '1.2rem', borderRadius: '12px'}}>
+                               <div style={{fontSize: '0.75rem', fontWeight: 'bold', color: '#34d399', marginBottom: '0.5rem'}}>LATEST TOPIC COVERED</div>
+                               {classDetails.sessions[0] ? (
+                                 <div>
+                                    <div style={{fontSize: '1rem'}}>{classDetails.sessions[0].summary}</div>
+                                    <div style={{fontSize: '0.75rem', opacity: 0.6, marginTop: '0.4rem'}}>Subject: {classDetails.subjects.find(s => s.id === classDetails.sessions[0].subject)?.name || 'General'} • {classDetails.sessions[0].date}</div>
+                                 </div>
+                               ) : "No sessions logged yet."}
+                            </div>
+                            <div style={{background: 'rgba(236,72,153,0.05)', border: '1px solid rgba(236,72,153,0.1)', padding: '1.2rem', borderRadius: '12px'}}>
+                               <div style={{fontSize: '0.75rem', fontWeight: 'bold', color: '#ec4899', marginBottom: '0.5rem'}}>UPCOMING HOMEWORK</div>
+                               {classDetails.homework.filter(h => new Date(h.deadline) > new Date()).map(hw => (
+                                 <div key={hw.id} style={{marginBottom: '0.8rem', paddingBottom: '0.8rem', borderBottom: '1px solid rgba(255,255,255,0.05)'}}>
+                                    <div style={{fontWeight: 'bold'}}>{hw.title}</div>
+                                    <div style={{fontSize: '0.75rem', opacity: 0.6}}>Deadline: {new Date(hw.deadline).toLocaleString()}</div>
+                                 </div>
+                               ))}
+                               {!classDetails.homework.length && <div style={{fontSize: '0.85rem', opacity: 0.5}}>No pending assignments.</div>}
+                            </div>
+                         </div>
+                      </div>
+                  </div>
+               </div>
+            </div>
+          ) : (
+            <div>
+              <div className="dashboard-card" style={{marginBottom: '2rem'}}>
+                 <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem'}}>
+                    <div>
+                       <h3>Institution Structure</h3>
+                       <p style={{opacity: 0.6}}>Add and manage classrooms or organizational units.</p>
+                    </div>
+                    <div className="search-container" style={{maxWidth: '400px'}}>
+                       <i className="fas fa-search"></i>
+                       <input 
+                          placeholder="Search Classrooms..." 
+                          value={classroomSearch} 
+                          onChange={e => setClassroomSearch(e.target.value)} 
+                       />
+                    </div>
+                 </div>
+                 <div style={{display: 'flex', gap: '1rem'}}>
+                    <input value={newClassroom} onChange={e => setNewClassroom(e.target.value)} placeholder="e.g. Class 10-A or Physics Lab" style={{flex: 1}} />
+                    <button onClick={handleAddClassroom} className="btn-primary">Create Classroom</button>
+                 </div>
+              </div>
+              <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem'}}>
+                 {classrooms.filter(c => c.name.toLowerCase().includes(classroomSearch.toLowerCase())).map(c => (
+                    <div key={c.id} onClick={() => setSelectedClassId(c.id)} className="dashboard-card" style={{border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', position: 'relative', overflow: 'hidden'}} onMouseOver={e => {e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.borderColor = 'var(--primary-color)';}} onMouseOut={e => {e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'var(--border-color)';}}>
+                       <div style={{position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: 'var(--primary-color)', opacity: 0.5}}></div>
+                       <div>
+                          <h4 style={{margin: 0}}>{c.name}</h4>
+                          <div style={{fontSize: '0.8rem', opacity: 0.5}}>{subjects.filter(s => s.classroom === c.id).length} Active Subjects</div>
+                       </div>
+                       <i className="fas fa-chevron-right" style={{opacity: 0.3}}></i>
+                    </div>
+                 ))}
+              </div>
+              {classrooms.length === 0 && <p style={{textAlign: 'center', padding: '4rem', opacity: 0.4}}>No classrooms defined yet.</p>}
+            </div>
+          )}
+        </div>
+      )}
+
       {activeTab === 'schemas' && org && (
         <div className="animate-fadeIn">
            <div style={{display: 'flex', gap: '1rem', marginBottom: '2rem'}}>
@@ -640,35 +1299,339 @@ function ManagerDashboard({ token }) {
              </div>
            ) : (
              <div>
-                <div style={{display: 'flex', gap: '1rem', marginBottom: '2rem'}}>
-                   <button onClick={() => setShowAddStudent(true)} className="btn-primary">New Student Record</button>
-                   <button className="btn-secondary" onClick={() => window.open(`${API_BASE_URL}/api/students/download_template/?organization=${org.id}`)}>Get Template</button>
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem'}}>
+                   <div style={{display: 'flex', gap: '1rem'}}>
+                      <button onClick={() => setShowAddStudent(true)} className="btn-primary">New Student Record</button>
+                      <button className="btn-secondary" onClick={() => window.open(`${API_BASE_URL}/api/students/download_template/?organization=${org.id}`)}>Get Template</button>
+                   </div>
+                   <div className="search-container" style={{maxWidth: '400px'}}>
+                      <i className="fas fa-search"></i>
+                      <input 
+                         placeholder="Search Students..." 
+                         value={studentSearch} 
+                         onChange={e => setStudentSearch(e.target.value)} 
+                      />
+                   </div>
                 </div>
                 <div className="dashboard-card">
-                  <table style={{width: '100%', textAlign: 'left'}}>
-                     <thead><tr style={{opacity: 0.5}}><th>Name</th><th>Class</th><th>Custom Data Points</th></tr></thead>
-                     <tbody>
-                        {students.map(s => <tr key={s.id} style={{borderTop: '1px solid #334155'}}><td style={{padding: '1rem'}}>{s.first_name} {s.last_name}</td><td>{s.classroom_name || 'Unassigned'}</td><td>{Object.keys(s.custom_data || {}).length} Fields</td></tr>)}
-                     </tbody>
-                  </table>
-                  {students.length === 0 && <p style={{textAlign: 'center', padding: '2rem', opacity: 0.5}}>No data records for this query.</p>}
+                   <table style={{width: '100%', textAlign: 'left', borderCollapse: 'separate', borderSpacing: '0 0.5rem'}}>
+                      <thead>
+                        <tr style={{opacity: 0.5}}>
+                          {org.student_fields_config?.slice(0, 3).map(f => <th key={f.id} style={{padding: '1rem'}}>{f.name}</th>)}
+                          <th style={{padding: '1rem'}}>Portal Login</th>
+                          <th style={{padding: '1rem', textAlign: 'right'}}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                         {students.filter(s => 
+                            Object.values(s.custom_data || {}).some(v => v.toString().toLowerCase().includes(studentSearch.toLowerCase()))
+                         ).map(s => (
+                           <tr key={s.id} style={{background: 'rgba(255,255,255,0.02)'}}>
+                             {org.student_fields_config?.slice(0, 3).map((f, idx) => (
+                               <td key={f.id} style={{padding: '1rem', borderRadius: idx === 0 ? '12px 0 0 12px' : '0'}}>{s.custom_data?.[f.name] || '-'}</td>
+                             ))}
+                             <td style={{padding: '1rem'}}>
+                                <div style={{fontSize: '0.75rem', opacity: 0.6}}>User: <strong>{s.user_username || 'N/A'}</strong></div>
+                                <div style={{fontSize: '0.75rem', opacity: 0.4}}>Default: Pass@{s.registration_number}</div>
+                             </td>
+                             <td style={{padding: '1rem', textAlign: 'right', borderRadius: '0 12px 12px 0'}}>
+                                <button className="btn-secondary" style={{padding: '0.4rem 0.6rem'}} onClick={() => { setEditingStudent(s); setStudentForm({ custom_data: s.custom_data }); setShowAddStudent(true); }}>Edit</button>
+                                <button onClick={async () => {
+                                   if(!window.confirm("Permanently archive student record?")) return;
+                                   await fetch(`${API_BASE_URL}/api/students/${s.id}/`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                                   fetchItems();
+                                }} style={{marginLeft: '0.5rem', background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: 'none', padding: '0.4rem 0.6rem', borderRadius: '4px', cursor: 'pointer'}}>Archive</button>
+                             </td>
+                           </tr>
+                         ))}
+                      </tbody>
+                   </table>
+                   {students.length === 0 && <p style={{textAlign: 'center', padding: '2rem', opacity: 0.5}}>No data records for this query.</p>}
                 </div>
              </div>
+
            )}
         </div>
       )}
 
+      {activeTab === 'instructors' && org && (
+        <div className="animate-fadeIn">
+          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem'}}>
+            <div style={{display: 'flex', gap: '1rem'}}>
+              <button onClick={() => setShowAddInstructor(true)} className="btn-primary">Add New Instructor</button>
+              <button className="btn-secondary" onClick={() => window.open(`${API_BASE_URL}/api/instructors/download_template/?organization=${org.id}`)}>Download Template</button>
+            </div>
+            <div className="search-container" style={{maxWidth: '400px'}}>
+               <i className="fas fa-search"></i>
+               <input 
+                  placeholder="Search Staff..." 
+                  value={instructorSearch} 
+                  onChange={e => setInstructorSearch(e.target.value)} 
+               />
+            </div>
+          </div>
+          <div className="dashboard-card">
+            <table style={{width: '100%', textAlign: 'left', borderCollapse: 'separate', borderSpacing: '0 0.5rem'}}>
+              <thead>
+                <tr style={{opacity: 0.5}}>
+                  {org.instructor_fields_config?.slice(0, 3).map(f => <th key={f.id} style={{padding: '1rem'}}>{f.name}</th>)}
+                  <th style={{padding: '1rem'}}>Staff Login</th>
+                  <th style={{padding: '1rem', textAlign: 'right'}}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {instructors.filter(inst => 
+                  Object.values(inst.custom_data || {}).some(v => v.toString().toLowerCase().includes(instructorSearch.toLowerCase()))
+                ).map(inst => (
+                  <tr key={inst.id} style={{background: 'rgba(255,255,255,0.02)'}}>
+                    {org.instructor_fields_config?.slice(0, 3).map((f, idx) => (
+                      <td key={f.id} style={{padding: '1rem', borderRadius: idx === 0 ? '12px 0 0 12px' : '0'}}>{inst.custom_data?.[f.name] || '-'}</td>
+                    ))}
+                    <td style={{padding: '1rem'}}>
+                       <div style={{fontSize: '0.75rem', opacity: 0.6}}>User: <strong>{inst.user_username || 'N/A'}</strong></div>
+                       <div style={{fontSize: '0.75rem', opacity: 0.4}}>Default: Pass@{inst.registration_number}</div>
+                    </td>
+                    <td style={{padding: '1rem', textAlign: 'right', borderRadius: '0 12px 12px 0'}}>
+                        <button className="btn-secondary" style={{padding: '0.4rem 0.6rem'}} onClick={() => {
+                           setEditingInstructor(inst);
+                           const taught = subjects.filter(s => s.instructor === inst.id).map(s => s.id);
+                           setInstructorForm({ subjects: taught, custom_data: inst.custom_data || {} });
+                           setShowAddInstructor(true);
+                        }}>Edit</button>
+                       <button onClick={async () => {
+                          if(!window.confirm("Revoke instructor access? This removes them from all subjects.")) return;
+                          await fetch(`${API_BASE_URL}/api/instructors/${inst.id}/`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                          fetchItems();
+                       }} style={{marginLeft: '0.5rem', background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: 'none', padding: '0.4rem 0.6rem', borderRadius: '4px', cursor: 'pointer'}}>Revoke</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {instructors.length === 0 && <p style={{textAlign: 'center', padding: '2rem', opacity: 0.5}}>No instructors found.</p>}
+          </div>
+        </div>
+      )}
+
       {activeTab === 'profile' && org && (
-        <div className="dashboard-card animate-fadeIn">
-           <h3>Organization Profile</h3>
-           <p style={{color: 'var(--text-muted)'}}>Manage your institution's public profile and contact information.</p>
-           <form style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '2rem'}}>
-             <div className="form-group" style={{gridColumn: '1/-1'}}><label>Organization Name</label><input value={org.name || ''} onChange={e => setOrg({...org, name: e.target.value})} /></div>
-             <div className="form-group"><label>Contact Email</label><input value={org.contact_email || ''} onChange={e => setOrg({...org, contact_email: e.target.value})} /></div>
-             <div className="form-group"><label>Phone Number</label><input value={org.phone_number || ''} onChange={e => setOrg({...org, phone_number: e.target.value})} /></div>
-             <div className="form-group" style={{gridColumn: '1/-1'}}><label>Address</label><textarea value={org.address || ''} onChange={e => setOrg({...org, address: e.target.value})} rows="3"></textarea></div>
-             <div className="form-group" style={{gridColumn: '1/-1'}}><label>Description</label><textarea value={org.description || ''} onChange={e => setOrg({...org, description: e.target.value})} rows="4"></textarea></div>
-           </form>
+        <div className="animate-fadeIn">
+          <div style={{display: 'flex', gap: '2rem'}}>
+             {/* Profile Column */}
+             <div className="dashboard-card" style={{flex: 1}}>
+                <h3>Organization Information</h3>
+                <p style={{color: 'var(--text-muted)'}}>Basic details of your institution.</p>
+                <form style={{display: 'grid', gridTemplateColumns: '1fr', gap: '1.2rem', marginTop: '1.5rem'}}>
+                   <div className="form-group"><label>Name</label><input value={org.name || ''} onChange={e => setOrg({...org, name: e.target.value})} /></div>
+                   <div className="form-group"><label>Primary Contact</label><input value={org.contact_email || ''} onChange={e => setOrg({...org, contact_email: e.target.value})} /></div>
+                   <div className="form-group"><label>Portal Access</label><div className={`badge ${org.has_portal_access ? 'badge-success' : 'badge-warning'}`} style={{display: 'inline-block'}}>{org.has_portal_access ? 'ENABLED' : 'DISABLED'}</div></div>
+                </form>
+             </div>
+
+             {/* Settings Column */}
+             <div className="dashboard-card" style={{flex: 1.5, border: '1px solid var(--primary-color)'}}>
+                <div style={{display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '1rem'}}>
+                   <div className="badge badge-success" style={{padding: '0.5rem'}}><i className="fas fa-clock"></i></div>
+                   <h3>School Operations & Intervals</h3>
+                </div>
+                <p style={{fontSize: '0.85rem', opacity: 0.6, marginBottom: '2rem'}}>Configure global hours and define specific intervals/breaks.</p>
+                
+                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem', marginBottom: '2rem'}}>
+                   <div className="form-group">
+                      <label>School Starts At</label>
+                      <input type="time" value={org.school_start_time || ''} onChange={async (e) => {
+                         const time = e.target.value.length === 5 ? e.target.value + ':00' : e.target.value;
+                         await fetch(`${API_BASE_URL}/api/organizations/${org.id}/`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify({ school_start_time: time })
+                         });
+                         fetchItems();
+                      }} />
+                   </div>
+                   <div className="form-group">
+                      <label>School Ends At</label>
+                      <input type="time" value={org.school_end_time || ''} onChange={async (e) => {
+                         const time = e.target.value.length === 5 ? e.target.value + ':00' : e.target.value;
+                         await fetch(`${API_BASE_URL}/api/organizations/${org.id}/`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify({ school_end_time: time })
+                         });
+                         fetchItems();
+                      }} />
+                   </div>
+                   <div className="form-group">
+                      <label>Period Duration (min)</label>
+                      <input type="number" value={org.period_duration_minutes || ''} onChange={async (e) => {
+                         await fetch(`${API_BASE_URL}/api/organizations/${org.id}/`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify({ period_duration_minutes: parseInt(e.target.value) })
+                         });
+                         fetchItems();
+                      }} />
+                   </div>
+                </div>
+
+                <div style={{borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem'}}>
+                   <h4 style={{marginBottom: '1rem'}}>Custom Breaks & Intervals</h4>
+                   <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '0.8rem', background: 'rgba(15,23,42,0.6)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.5rem'}}>
+                      <input placeholder="Break Name" value={newInterval.name} onChange={e => setNewInterval({...newInterval, name: e.target.value})} />
+                      <input type="time" value={newInterval.start} onChange={e => setNewInterval({...newInterval, start: e.target.value})} />
+                      <input type="time" value={newInterval.end} onChange={e => setNewInterval({...newInterval, end: e.target.value})} />
+                      <button onClick={async () => {
+                         if(!newInterval.name || !newInterval.start || !newInterval.end) return;
+                         const updated = [...(org.custom_intervals || []), newInterval];
+                         await fetch(`${API_BASE_URL}/api/organizations/${org.id}/`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify({ custom_intervals: updated })
+                         });
+                         setNewInterval({ name: '', start: '', end: '' });
+                         fetchItems();
+                      }} className="btn-primary" style={{padding: '0 1rem'}}><i className="fas fa-plus"></i></button>
+                   </div>
+
+                   <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
+                      {(org.custom_intervals || []).map((inv, idx) => (
+                         <div key={idx} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.8rem 1.2rem', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)'}}>
+                            <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+                               <div className="badge badge-warning" style={{width: '2.5rem', height: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', padding: 0}}><i className="fas fa-coffee"></i></div>
+                               <div>
+                                  <div style={{fontWeight: 'bold'}}>{inv.name}</div>
+                                  <div style={{fontSize: '0.8rem', opacity: 0.5}}>{inv.start} - {inv.end}</div>
+                               </div>
+                            </div>
+                            <button onClick={async () => {
+                               const updated = org.custom_intervals.filter((_, i) => i !== idx);
+                               await fetch(`${API_BASE_URL}/api/organizations/${org.id}/`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                  body: JSON.stringify({ custom_intervals: updated })
+                               });
+                               fetchItems();
+                            }} style={{background: 'transparent', border: 'none', color: '#EF4444', cursor: 'pointer', opacity: 0.6}}><i className="fas fa-trash-alt"></i></button>
+                         </div>
+                      ))}
+                      {(!org.custom_intervals || org.custom_intervals.length === 0) && (
+                         <div style={{textAlign: 'center', padding: '2rem', opacity: 0.3, fontSize: '0.85rem'}}>No custom intervals defined.</div>
+                      )}
+                   </div>
+                </div>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {showAddStudent && (
+        <div className="modal-overlay" style={{background: 'rgba(0,0,0,0.85)', position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100}}>
+          <div className="dashboard-card animate-slideUp" style={{width: '600px', maxHeight: '90vh', overflowY: 'auto'}}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem'}}>
+                <h3 className="nav-brand" style={{fontSize: '1.8rem'}}>{editingStudent ? 'Edit Record' : 'New Record'}</h3>
+                <button onClick={() => { setShowAddStudent(false); setEditingStudent(null); }} style={{background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', fontSize: '1.5rem'}}>&times;</button>
+            </div>
+             <form onSubmit={handleCreateOrUpdateStudent}>
+              <div className="form-group" style={{marginBottom: '1.5rem'}}>
+                 <label>Assigned Classroom</label>
+                 <select required value={studentForm.classroom} onChange={e => setStudentForm({...studentForm, classroom: e.target.value})}>
+                    <option value="">Select Classroom...</option>
+                    {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                 </select>
+              </div>
+
+              {org.student_fields_config?.length > 0 ? (
+                <div style={{marginTop: '1rem'}}>
+                  <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem'}}>
+                    {org.student_fields_config.map(field => (
+                      <div key={field.id} className="form-group">
+                        <label>{field.name}</label>
+                        {field.type === 'select' ? (
+                          <select required value={studentForm.custom_data[field.name] || ''} onChange={e => setStudentForm({ ...studentForm, custom_data: { ...studentForm.custom_data, [field.name]: e.target.value } })}>
+                            <option value="">Select Option</option>
+                            {field.options?.map(o => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        ) : (
+                          <input 
+                            required
+                            type={field.type === 'number' ? 'number' : (field.type === 'date' ? 'date' : (field.type === 'checkbox' ? 'checkbox' : 'text'))} 
+                            value={studentForm.custom_data[field.name] || ''} 
+                            onChange={e => setStudentForm({ ...studentForm, custom_data: { ...studentForm.custom_data, [field.name]: field.type === 'checkbox' ? e.target.checked : e.target.value } })} 
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div style={{textAlign: 'center', padding: '2rem'}}>
+                   <p>No schema defined. please go to <strong>Schemas</strong> tab first.</p>
+                </div>
+              )}
+              <button type="submit" className="btn-primary" style={{width: '100%', marginTop: '2rem', padding: '1rem'}} disabled={!org.student_fields_config?.length}>Create Profile</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showAddInstructor && (
+        <div className="modal-overlay" style={{background: 'rgba(0,0,0,0.85)', position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100}}>
+          <div className="dashboard-card animate-slideUp" style={{width: '600px'}}>
+             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem'}}>
+                <h3 className="nav-brand" style={{fontSize: '1.8rem'}}>{editingInstructor ? 'Edit Profile' : 'New Instructor'}</h3>
+                <button onClick={() => { setShowAddInstructor(false); setEditingInstructor(null); setInstructorForm({subjects: [], custom_data: {}}); }} style={{background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', fontSize: '1.5rem'}}>&times;</button>
+            </div>
+            <form onSubmit={handleCreateOrUpdateInstructor}>
+              <div className="form-group" style={{marginBottom: '1.5rem'}}>
+                 <label>Responsibilities (Taught Subjects)</label>
+                 <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px'}}>
+                    {subjects.length > 0 ? (
+                       subjects.map(s => (
+                          <label key={s.id} style={{fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer'}}>
+                             <input 
+                                type="checkbox" 
+                                checked={instructorForm.subjects.includes(s.id)} 
+                                onChange={e => {
+                                   const next = e.target.checked 
+                                      ? [...instructorForm.subjects, s.id] 
+                                      : instructorForm.subjects.filter(sid => sid !== s.id);
+                                   setInstructorForm({...instructorForm, subjects: next});
+                                }} 
+                             />
+                             {s.name} ({classrooms.find(c => c.id === s.classroom)?.name || 'N/A'})
+                          </label>
+                       ))
+                    ) : (
+                       <p style={{fontSize: '0.8rem', opacity: 0.5}}>No subjects defined in system yet.</p>
+                    )}
+                 </div>
+              </div>
+
+              {org.instructor_fields_config?.length > 0 ? (
+                <div style={{marginTop: '1rem'}}>
+                  <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem'}}>
+                    {org.instructor_fields_config.map(field => (
+                      <div key={field.id} className="form-group">
+                        <label>{field.name}</label>
+                        <input 
+                           required
+                           type={field.type === 'number' ? 'number' : (field.type === 'date' ? 'date' : 'text')} 
+                           value={instructorForm.custom_data[field.name] || ''} 
+                           onChange={e => setInstructorForm({ ...instructorForm, custom_data: { ...instructorForm.custom_data, [field.name]: e.target.value } })} 
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div style={{textAlign: 'center', padding: '2rem'}}>
+                   <p>No instructor schema defined.</p>
+                </div>
+              )}
+              <button type="submit" className="btn-primary" style={{width: '100%', marginTop: '2rem', padding: '1rem'}} disabled={!org.instructor_fields_config?.length}>
+                 {editingInstructor ? 'Update Profile' : 'Add Instructor'}
+              </button>
+            </form>
+          </div>
         </div>
       )}
       </div>
