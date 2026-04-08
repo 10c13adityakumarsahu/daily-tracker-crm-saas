@@ -57,9 +57,10 @@ class Subject(models.Model):
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='subjects')
     classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE, related_name='subjects', null=True, blank=True)
     instructors = models.ManyToManyField(Instructor, related_name='taught_subjects', blank=True)
+    is_template = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"{self.name} ({self.classroom.name if self.classroom else 'No Class'})"
+        return f"{self.name} ({self.classroom.name if self.classroom else ('Template' if self.is_template else 'No Class')})"
 
 class Parent(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='parent_profile')
