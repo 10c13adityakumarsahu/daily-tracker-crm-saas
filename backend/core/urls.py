@@ -18,6 +18,7 @@ router.register(r'homeworks', HomeworkViewSet, basename='homework')
 router.register(r'materials', MaterialViewSet, basename='material')
 router.register(r'classrooms', ClassroomViewSet, basename='classroom')
 router.register(r'subjects', SubjectViewSet, basename='subject')
+router.register(r'daily_tasks', DailyTaskViewSet, basename='dailytask')
 
 urlpatterns = [
     path('api/signup/organizer/', organizer_signup, name='organizer_signup'),

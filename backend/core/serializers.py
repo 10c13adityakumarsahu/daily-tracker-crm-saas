@@ -8,12 +8,14 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         data = super().validate(attrs)
         user = self.user
         
-        if user.role in ['PARENT', 'INSTRUCTOR']:
+        if user.role in ['PARENT', 'INSTRUCTOR', 'STUDENT']:
             org = None
             if hasattr(user, 'parent_profile'):
-                org = hasattr(user.parent_profile, 'organization') and user.parent_profile.organization
+                org = user.parent_profile.organization
             elif hasattr(user, 'instructor_profile'):
-                org = hasattr(user.instructor_profile, 'organization') and user.instructor_profile.organization
+                org = user.instructor_profile.organization
+            elif hasattr(user, 'student_profile'):
+                org = user.student_profile.organization
             
             if org and not org.has_portal_access:
                 raise AuthenticationFailed("Organization access is pending or denied.")
@@ -107,3 +109,20 @@ class MaterialSerializer(serializers.ModelSerializer):
     class Meta:
         model = Material
         fields = '__all__'
+
+class DailyTaskSerializer(serializers.ModelSerializer):
+    subject_name = serializers.ReadOnlyField(source='subject.name')
+    instructor_name = serializers.SerializerMethodField()
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+    
+    # Allow these to be set automatically in perform_create
+    organization = serializers.PrimaryKeyRelatedField(queryset=Organization.objects.all(), required=False)
+    instructor = serializers.PrimaryKeyRelatedField(queryset=Instructor.objects.all(), required=False)
+
+    class Meta:
+        model = DailyTask
+        fields = '__all__'
+
+    def get_instructor_name(self, obj):
+        i = obj.instructor
+        return str(list(i.custom_data.values())[0]) if i.custom_data else str(i.registration_number)

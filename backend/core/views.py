@@ -22,8 +22,17 @@ class ClassroomViewSet(viewsets.ModelViewSet):
     serializer_class = ClassroomSerializer
     permission_classes = [permissions.IsAuthenticated]
     def get_queryset(self):
-        org = get_query_param(self.request, 'organization')
+        user = self.request.user
         qs = Classroom.objects.all()
+        if user.role == 'INSTRUCTOR':
+            from django.db.models import Q
+            return qs.filter(Q(instructors__user=user) | Q(subjects__instructors__user=user)).distinct()
+        if user.role == 'STUDENT':
+            student = getattr(user, 'student_profile', None)
+            if student and student.classroom:
+                return qs.filter(id=student.classroom.id)
+        
+        org = get_query_param(self.request, 'organization')
         if org: qs = qs.filter(organization_id=org)
         return qs
 
@@ -34,15 +43,23 @@ class SubjectViewSet(viewsets.ModelViewSet):
         user = self.request.user
         qs = Subject.objects.all()
         if user.role == 'INSTRUCTOR':
-            return qs.filter(instructor__user=user)
+            return qs.filter(instructors__user=user)
         if user.role == 'STUDENT':
             student = getattr(user, 'student_profile', None)
             if student and student.classroom:
                 return qs.filter(classroom=student.classroom)
-        org = get_query_param(self.request, 'organization')
-        if org: qs = qs.filter(organization_id=org)
+        if user.role == 'MANAGER':
+            org = getattr(user, 'managed_org', None)
+            if org: qs = qs.filter(organization=org)
+        
+        # Additional manual filters
+        org_param = get_query_param(self.request, 'organization')
+        if org_param: qs = qs.filter(organization_id=org_param)
         classroom = get_query_param(self.request, 'classroom')
         if classroom: qs = qs.filter(classroom_id=classroom)
+        is_template = get_query_param(self.request, 'is_template')
+        if is_template is not None:
+            qs = qs.filter(is_template=(is_template.lower() == 'true'))
         return qs
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -126,21 +143,33 @@ class StudentViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        user = self.request.user
         qs = Student.objects.all()
-        if self.request.user.role == 'ADMIN':
+        
+        if user.role == 'ADMIN':
             org_id = get_query_param(self.request, 'organization')
-            if org_id:
-                qs = qs.filter(organization_id=org_id)
+            if org_id: qs = qs.filter(organization_id=org_id)
             return qs
         
-        if self.request.user.role == 'MANAGER':
-            org = getattr(self.request.user, 'managed_org', None)
+        if user.role == 'MANAGER':
+            org = getattr(user, 'managed_org', None)
             if org:
                 qs = qs.filter(organization=org)
                 classroom = get_query_param(self.request, 'classroom')
                 if classroom: qs = qs.filter(classroom_id=classroom)
                 return qs
         
+        if user.role == 'INSTRUCTOR':
+            instructor = getattr(user, 'instructor_profile', None)
+            if instructor:
+                from django.db.models import Q
+                return qs.filter(Q(classroom__instructors=instructor) | Q(classroom__subjects__instructors=instructor)).distinct()
+        
+        if user.role == 'STUDENT':
+            student = getattr(user, 'student_profile', None)
+            if student:
+                return qs.filter(classroom=student.classroom)
+
         return Student.objects.none()
 
     def perform_create(self, serializer):
@@ -158,16 +187,16 @@ class StudentViewSet(viewsets.ModelViewSet):
                 org_id = org.id
 
         user, created = User.objects.get_or_create(username=username, defaults={'role': 'STUDENT'})
-        if created:
-            user.set_password(password)
-            user.save()
+        user.set_password(password)
+        user.is_active = True
+        user.save()
             
         instance = serializer.save(user=user, organization_id=org_id)
         # Inject transient fields for the response
         instance.generated_username = username
         instance.generated_password = password
 
-    @action(detail=False, methods=['GET'])
+    @action(detail=False, methods=['GET'], permission_classes=[permissions.AllowAny])
     def download_template(self, request):
         import csv
         from django.http import HttpResponse
@@ -198,6 +227,7 @@ class StudentViewSet(viewsets.ModelViewSet):
 
             user, _ = User.objects.get_or_create(username=username, defaults={'role': 'STUDENT'})
             user.set_password(password)
+            user.is_active = True
             user.save()
             
             custom_data = {k.replace('custom_',''): v for k, v in row.items() if k.startswith('custom_')}
@@ -231,14 +261,14 @@ class TimetableViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         subject = serializer.validated_data['subject']
-        instructor = subject.instructor
+        instructors = subject.instructors.all()
         day = serializer.validated_data['day_of_week']
         start = serializer.validated_data['start_time']
         
-        if instructor:
-           clashes = Timetable.objects.filter(subject__instructor=instructor, day_of_week=day, start_time=start)
-           if clashes.exists():
-              raise serializers.ValidationError({"error": f"Clash! Instructor is already in {clashes[0].subject.classroom.name} for {clashes[0].subject.name}."})
+        for instructor in instructors:
+            clashes = Timetable.objects.filter(subject__instructors=instructor, day_of_week=day, start_time=start)
+            if clashes.exists():
+                raise serializers.ValidationError({"error": f"Clash! Instructor {instructor.registration_number} is already in {clashes[0].subject.classroom.name} for {clashes[0].subject.name}."})
         
         serializer.save()
 
@@ -291,10 +321,11 @@ class InstructorViewSet(viewsets.ModelViewSet):
         password = user_data.get('password') or "Pass@123"
         user, _ = User.objects.get_or_create(username=username, defaults={'role': 'INSTRUCTOR'})
         user.set_password(password)
+        user.is_active = True
         user.save()
         serializer.save(user=user)
 
-    @action(detail=False, methods=['GET'])
+    @action(detail=False, methods=['GET'], permission_classes=[permissions.AllowAny])
     def download_template(self, request):
         import csv
         from django.http import HttpResponse
@@ -320,7 +351,8 @@ class InstructorViewSet(viewsets.ModelViewSet):
             username = row.get('username')
             reg_no = row.get('registration_number')
             user, _ = User.objects.get_or_create(username=username, defaults={'role': 'INSTRUCTOR'})
-            user.set_password("Pass@123")
+            user.set_password(f"Pass@{reg_no}")
+            user.is_active = True
             user.save()
             custom_data = {k.replace('custom_',''): v for k, v in row.items() if k.startswith('custom_')}
             Instructor.objects.create(user=user, organization_id=org_id, registration_number=reg_no, designation=row.get('designation'), custom_data=custom_data)
@@ -357,4 +389,44 @@ def organizer_signup(request):
     org = Organization.objects.create(name=org_name, manager=user, has_portal_access=False)
     
     return Response({'message': 'Organizer and organization created. Waiting for admin approval.'}, status=status.HTTP_201_CREATED)
+
+class DailyTaskViewSet(viewsets.ModelViewSet):
+    serializer_class = DailyTaskSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = DailyTask.objects.all()
+        
+        # Filtering
+        org = get_query_param(self.request, 'organization')
+        if org: qs = qs.filter(organization_id=org)
+        
+        classroom = get_query_param(self.request, 'classroom')
+        if classroom: qs = qs.filter(classroom_id=classroom)
+        
+        date = get_query_param(self.request, 'date')
+        if date: qs = qs.filter(date=date)
+        
+        if user.role == 'MANAGER':
+            org_obj = getattr(user, 'managed_org', None)
+            if org_obj: qs = qs.filter(organization=org_obj)
+        elif user.role == 'INSTRUCTOR':
+            instructor = getattr(user, 'instructor_profile', None)
+            if instructor: qs = qs.filter(classroom__instructors=instructor)
+        elif user.role == 'STUDENT':
+            student = getattr(user, 'student_profile', None)
+            if student and student.classroom:
+                qs = qs.filter(classroom=student.classroom)
+        
+        return qs
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if user.role == 'INSTRUCTOR':
+            instructor = getattr(user, 'instructor_profile', None)
+            org = instructor.organization
+            serializer.save(instructor=instructor, organization=org)
+        else:
+            serializer.save()
 

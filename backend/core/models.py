@@ -7,6 +7,7 @@ class User(AbstractUser):
         ('ADMIN', 'Admin'),
         ('MANAGER', 'Organization Manager'),
         ('INSTRUCTOR', 'Instructor'),
+        ('STUDENT', 'Student'),
         ('PARENT', 'Parent'),
     )
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='ADMIN')
@@ -43,6 +44,7 @@ class Instructor(models.Model):
     registration_number = models.CharField(max_length=100, blank=True, null=True)
     designation = models.CharField(max_length=255, blank=True, null=True)
     custom_data = models.JSONField(default=dict, blank=True)
+    classrooms = models.ManyToManyField('Classroom', related_name='instructors', blank=True)
     
 class Classroom(models.Model):
     name = models.CharField(max_length=255) # e.g. "Class 10A"
@@ -58,6 +60,11 @@ class Subject(models.Model):
     classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE, related_name='subjects', null=True, blank=True)
     instructors = models.ManyToManyField(Instructor, related_name='taught_subjects', blank=True)
     is_template = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        if not self.classroom:
+            self.is_template = True
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.name} ({self.classroom.name if self.classroom else ('Template' if self.is_template else 'No Class')})"
@@ -109,3 +116,25 @@ class Material(models.Model):
     name = models.CharField(max_length=255)
     file_url = models.URLField() # Could be Google Drive URL
     uploaded_at = models.DateTimeField(auto_now_add=True)
+
+class DailyTask(models.Model):
+    CATEGORY_CHOICES = (
+        ('CW', 'Classwork'),
+        ('HW', 'Homework'),
+        ('PROJECT', 'Project'),
+        ('ASSIGNMENT', 'Assignment'),
+    )
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='daily_tasks')
+    classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE, related_name='daily_tasks')
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='daily_tasks')
+    instructor = models.ForeignKey(Instructor, on_delete=models.CASCADE, related_name='created_tasks')
+    
+    date = models.DateField()
+    topic = models.CharField(max_length=255)
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    description = models.TextField(blank=True, null=True)
+    deadline = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.category}: {self.topic} ({self.date})"
