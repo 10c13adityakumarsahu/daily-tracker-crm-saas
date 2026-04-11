@@ -3,6 +3,35 @@ from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
 from .models import *
 from .serializers import *
+import requests
+import threading
+
+def trigger_webhook(instance, action='created'):
+    if not instance.organization.webhook_url:
+        return
+    
+    def send_request():
+        payload = {
+            'action': action,
+            'task': {
+                'id': instance.id,
+                'topic': instance.topic,
+                'category': instance.category,
+                'category_display': instance.get_category_display(),
+                'date': str(instance.date),
+                'description': instance.description,
+                'deadline': str(instance.deadline) if instance.deadline else None,
+                'subject': instance.subject.name if instance.subject else None,
+                'classroom': instance.classroom.name if instance.classroom else None,
+                'instructor': instance.instructor.user.username if instance.instructor else "Unknown",
+                'organization': instance.organization.name
+            }
+        }
+        try:
+            requests.post(instance.organization.webhook_url, json=payload, timeout=10)
+        except:
+            pass
+    threading.Thread(target=send_request).start()
 
 def get_query_param(request, key):
     val = request.query_params.get(key)
@@ -413,7 +442,9 @@ class DailyTaskViewSet(viewsets.ModelViewSet):
             if org_obj: qs = qs.filter(organization=org_obj)
         elif user.role == 'INSTRUCTOR':
             instructor = getattr(user, 'instructor_profile', None)
-            if instructor: qs = qs.filter(classroom__instructors=instructor)
+            if instructor:
+                from django.db.models import Q
+                qs = qs.filter(Q(classroom__instructors=instructor) | Q(subject__instructors=instructor)).distinct()
         elif user.role == 'STUDENT':
             student = getattr(user, 'student_profile', None)
             if student and student.classroom:
@@ -426,7 +457,16 @@ class DailyTaskViewSet(viewsets.ModelViewSet):
         if user.role == 'INSTRUCTOR':
             instructor = getattr(user, 'instructor_profile', None)
             org = instructor.organization
-            serializer.save(instructor=instructor, organization=org)
+            instance = serializer.save(instructor=instructor, organization=org)
         else:
-            serializer.save()
+            instance = serializer.save()
+        trigger_webhook(instance, action='created')
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        trigger_webhook(instance, action='updated')
+
+    def perform_destroy(self, instance):
+        trigger_webhook(instance, action='deleted')
+        instance.delete()
 

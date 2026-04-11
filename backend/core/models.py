@@ -37,6 +37,7 @@ class Organization(models.Model):
     instructor_fields_config = models.JSONField(default=list, blank=True)
     custom_intervals = models.JSONField(default=list, blank=True) # [{name, start, end}]
     licensing_details = models.JSONField(default=dict, blank=True)
+    webhook_url = models.URLField(max_length=500, blank=True, null=True)
 
 class Instructor(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='instructor_profile')

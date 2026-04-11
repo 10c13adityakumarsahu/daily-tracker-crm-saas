@@ -6,6 +6,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 function App() {
    const [token, setToken] = useState(localStorage.getItem('access_token'));
    const [role, setRole] = useState(localStorage.getItem('role'));
+   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
    const navigate = useNavigate();
 
    const [userProfile, setUserProfile] = useState(null);
@@ -37,10 +38,18 @@ function App() {
          {token && (
             <nav className="navbar">
                <div className="nav-brand">DailyTracker <span style={{ fontWeight: 200, opacity: 0.6 }}>SaaS</span></div>
-               <div className="nav-links">
-                  <Link to="/" className={window.location.pathname === '/' ? 'active' : ''}>Dashboard</Link>
-                  <button onClick={logout} className="btn-logout">Logout</button>
+               <div className={`nav-links ${mobileMenuOpen ? 'mobile-show' : ''}`}>
+                  <Link to="/" onClick={() => setMobileMenuOpen(false)} className={window.location.pathname === '/' ? 'active' : ''}>Dashboard</Link>
+                  <button onClick={() => { logout(); setMobileMenuOpen(false); }} className="btn-logout">
+                     <i className="fas fa-sign-out-alt"></i> Logout
+                  </button>
                </div>
+               {/* Show navbar hamburger only if NOT a manager, as managers have their own sidebar toggle */}
+               {role !== 'MANAGER' && (
+                  <button className="navbar-hamburger" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+                     <i className={`fas ${mobileMenuOpen ? 'fa-times' : 'fa-bars'}`}></i>
+                  </button>
+               )}
             </nav>
          )}
 
@@ -310,12 +319,12 @@ function AdminDashboard({ token }) {
          </div>
 
          {selected && (
-            <div className="modal-overlay" style={{ background: 'rgba(0,0,0,0.8)', position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-               <div className="dashboard-card animate-slideUp" style={{ width: '600px', border: '1px solid var(--primary-color)' }}>
+            <div className="modal-overlay" style={{ background: 'rgba(0,0,0,0.85)', position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+               <div className="dashboard-card animate-slideUp" style={{ width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid var(--primary-color)' }}>
                   <h3>Organization Analysis: {selected.name}</h3>
                   <p style={{ opacity: 0.7 }}>Structural integrity and licensing metadata.</p>
                   <hr style={{ opacity: 0.1, margin: '1rem 0' }} />
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }} className="grid-mobile-stack">
                      <div><strong>Plan:</strong> {selected.subscription_plan}</div>
                      <div><strong>Duration:</strong> {selected.subscription_duration_months} Months</div>
                      <div><strong>Student Model:</strong> {selected.student_fields_config.length} Fields</div>
@@ -737,11 +746,9 @@ function ManagerDashboard({ token, logout }) {
       <div className={`sidebar-overlay ${showMobileMenu ? 'visible' : ''}`} onClick={() => setShowMobileMenu(false)} />
       
       {/* Hamburger Toggle */}
-      <button className="hamburger" onClick={() => setShowMobileMenu(!showMobileMenu)} style={{position: 'fixed', top: '15px', right: '20px', background: 'var(--bg-secondary)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)'}}>
-            <span></span>
-            <span></span>
-            <span></span>
-         </button>
+      <button className="navbar-hamburger" onClick={() => setShowMobileMenu(!showMobileMenu)} style={{position: 'fixed', top: '15px', right: '20px', zIndex: 1100}}>
+            <i className={`fas ${showMobileMenu ? 'fa-times' : 'fa-bars'}`}></i>
+      </button>
          {/* SaaS Sidebar */}
          <div className={`sidebar ${showMobileMenu ? 'mobile-open' : ''}`} style={{ width: '280px', background: 'rgba(255,255,255,0.03)', borderRight: '1px solid var(--border-color)', padding: '2rem 1.5rem', display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh' }}>
             {org && (
@@ -772,7 +779,7 @@ function ManagerDashboard({ token, logout }) {
                ].map(tab => (
                   <button
                      key={tab.id}
-                     onClick={() => { setActiveTab(tab.id); setSelectedClassId(null); }}
+                     onClick={() => { setActiveTab(tab.id); setSelectedClassId(null); setShowMobileMenu(false); }}
                      className={activeTab === tab.id ? 'btn-primary' : 'btn-logout'}
                      style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '0.8rem 1.2rem' }}
                   >
@@ -795,17 +802,24 @@ function ManagerDashboard({ token, logout }) {
                   >
                      {org.subscription_plan === 'FREE' ? (org.is_payment_verified ? 'Activation Pending' : 'Activate License') : 'Renew License'}
                   </button>
+                  <button 
+                     onClick={logout} 
+                     className="btn-logout" 
+                     style={{ width: '100%', marginTop: '0.8rem', fontSize: '0.8rem', padding: '0.6rem', border: '1px solid rgba(255,255,255,0.1)' }}
+                  >
+                     <i className="fas fa-sign-out-alt" style={{ marginRight: '8px' }}></i> Logout Account
+                  </button>
                </div>
             )}
          </div>
 
-         <div className="main-content" style={{ flex: 1, padding: '2rem 3rem', overflowY: 'auto', background: '#080c14' }}>
+         <div className="manager-main-content" style={{ flex: 1, padding: '2rem 3rem', overflowX: 'hidden', background: '#080c14', minHeight: '100vh' }}>
             {activeTab === 'monitoring' && (
                <DailyMonitoringView token={token} />
             )}
             {showActivateModal && (
-               <div className="modal-overlay" style={{ background: 'rgba(0,0,0,0.85)', position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001 }}>
-                  <div className="dashboard-card animate-slideUp" style={{ width: '450px', position: 'relative' }}>
+               <div className="modal-overlay" style={{ background: 'rgba(0,0,0,0.85)', position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001, padding: '1rem' }}>
+                  <div className="dashboard-card animate-slideUp" style={{ width: '100%', maxWidth: '450px', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
                      <button onClick={() => setShowActivateModal(false)} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'transparent', border: 'none', color: 'white', cursor: 'pointer' }}><i className="fas fa-times"></i></button>
                      <h3 className="nav-brand" style={{ fontSize: '1.8rem' }}>Activate Platform</h3>
                      <p style={{ marginBottom: '2rem' }}>Unlock full institutional capabilities and remove trial limitations.</p>
@@ -845,18 +859,17 @@ function ManagerDashboard({ token, logout }) {
                   </div>
                </div>
             )}
-
             {showPayment && org && (
-               <div className="modal-overlay" style={{ background: 'rgba(0,0,0,0.85)', position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-                  <div className="dashboard-card animate-slideUp" style={{ width: '480px', textAlign: 'center' }}>
+               <div className="modal-overlay" style={{ background: 'rgba(0,0,0,0.85)', position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+                  <div className="dashboard-card animate-slideUp" style={{ width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', textAlign: 'center' }}>
                      <h3 className="nav-brand" style={{ fontSize: '1.8rem' }}>Secure Payment</h3>
                      <p>Simulated Gateway for {org.name}</p>
-
-                     <div style={{ display: 'flex', gap: '1rem', margin: '2rem 0' }}>
+ 
+                     <div style={{ display: 'flex', gap: '1rem', margin: '2rem 0' }} className="grid-mobile-stack">
                         <button onClick={() => setPaymentDuration(1)} className={paymentDuration === 1 ? 'btn-primary' : 'btn-logout'} style={{ flex: 1 }}>Monthly</button>
                         <button onClick={() => setPaymentDuration(12)} className={paymentDuration === 12 ? 'btn-primary' : 'btn-logout'} style={{ flex: 1 }}>Yearly (Save 20%)</button>
                      </div>
-
+ 
                      <div style={{ margin: '1.5rem 0', background: 'rgba(255,255,255,0.05)', padding: '1.5rem', borderRadius: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}><span>Plan:</span> <span>{paymentDuration === 1 ? 'Basic Monthly' : 'PRO Yearly'}</span></div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: 'bold' }}><span>Total Amount:</span> <span style={{ color: '#10B981' }}>${paymentDuration === 1 ? '99.00' : '999.00'}</span></div>
@@ -954,7 +967,7 @@ function ManagerDashboard({ token, logout }) {
 
                   <div className="dashboard-card" style={{ padding: '0', background: 'transparent', boxShadow: 'none' }}>
                      <div style={{ overflowX: 'auto', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)' }}>
-                        <div style={{ minWidth: '1200px', display: 'grid', gridTemplateColumns: `140px repeat(${classrooms.length}, 1fr)`, gap: '1px', background: 'rgba(255,255,255,0.05)' }}>
+                        <div style={{ minWidth: classrooms.length > 3 ? '1000px' : '100%', display: 'grid', gridTemplateColumns: `140px repeat(${classrooms.length}, 1fr)`, gap: '1px', background: 'rgba(255,255,255,0.05)' }}>
                            <div style={{ padding: '1.5rem', background: 'var(--background-card)', fontWeight: 900, color: 'var(--primary-color)', fontSize: '0.8rem', letterSpacing: '1px' }}>TIME SLOTS</div>
                            {classrooms.map(c => (
                               <div key={c.id} style={{ padding: '1.5rem', background: 'var(--background-card)', textAlign: 'center', fontWeight: 'bold', borderBottom: '2px solid rgba(192,132,252,0.3)', color: 'white', position: 'relative' }}>
@@ -1060,15 +1073,15 @@ function ManagerDashboard({ token, logout }) {
                      </div>
                   </div>
 
-                  <div className="dashboard-card">
+                  <div className="dashboard-card" style={{ padding: '0' }}>
                      <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-                        <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'separate', borderSpacing: '0 0.5rem' }}>
+                        <table className="responsive-table" style={{ width: '100%', textAlign: 'left', borderCollapse: 'separate', borderSpacing: '0 0.5rem' }}>
                            <thead><tr style={{ opacity: 0.5 }}><th style={{ padding: '0 1.2rem' }}>Course Name</th><th style={{ padding: '0 1.2rem' }}>Target Unit</th><th style={{ padding: '0 1.2rem' }}>Faculty Lead</th><th style={{ textAlign: 'right', padding: '0 1.2rem' }}>Admin</th></tr></thead>
                            <tbody>
                               {subjects.filter(s => s.name.toLowerCase().includes(courseSearch.toLowerCase())).map(s => (
                                  <tr key={s.id} style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '12px' }}>
-                                    <td style={{ padding: '1.2rem', borderRadius: '12px 0 0 12px' }}>{s.name}</td>
-                                    <td style={{ padding: '1.2rem' }}>
+                                    <td style={{ padding: '1.2rem' }} data-label="Course Name">{s.name}</td>
+                                    <td style={{ padding: '1.2rem' }} data-label="Target Unit">
                                        <select
                                           style={{ padding: '0.5rem 1rem', width: '100%', fontSize: '0.9rem' }}
                                           value={s.classroom || ''}
@@ -1084,7 +1097,7 @@ function ManagerDashboard({ token, logout }) {
                                           {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                        </select>
                                     </td>
-                                    <td style={{ padding: '1.2rem' }}>
+                                    <td style={{ padding: '1.2rem' }} data-label="Faculty Lead">
                                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                                           <div style={{ fontSize: '0.8rem', opacity: 0.7, flex: 1 }}>
                                              {s.instructor_names || 'No Faculty Assigned'}
@@ -1092,7 +1105,7 @@ function ManagerDashboard({ token, logout }) {
                                           <button onClick={() => setViewingSubject(s)} className="btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}>View & Manage Staff</button>
                                        </div>
                                     </td>
-                                    <td style={{ textAlign: 'right', padding: '1.2rem', borderRadius: '0 12px 12px 0' }}>
+                                    <td style={{ textAlign: 'right', padding: '1.2rem', borderRadius: '0 12px 12px 0' }} data-label="Admin">
                                        <button onClick={async () => {
                                           if (!window.confirm("Permanently delete course?")) return;
                                           await fetch(`${API_BASE_URL}/api/subjects/${s.id}/`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
@@ -1254,7 +1267,7 @@ function ManagerDashboard({ token, logout }) {
                   ) : (
                      <div>
                         <div className="dashboard-card" style={{ marginBottom: '2rem' }}>
-                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }} className="grid-mobile-stack">
                               <div>
                                  <h3>Institution Structure</h3>
                                  <p style={{ opacity: 0.6 }}>Add and manage classrooms or organizational units.</p>
@@ -1268,7 +1281,7 @@ function ManagerDashboard({ token, logout }) {
                                  />
                               </div>
                            </div>
-                           <div style={{ display: 'flex', gap: '1rem' }}>
+                           <div style={{ display: 'flex', gap: '1rem' }} className="grid-mobile-stack">
                               <input value={newClassroom} onChange={e => setNewClassroom(e.target.value)} placeholder="e.g. Class 10-A or Physics Lab" style={{ flex: 1 }} />
                               <button onClick={handleAddClassroom} className="btn-primary">Create Classroom</button>
                            </div>
@@ -1293,7 +1306,7 @@ function ManagerDashboard({ token, logout }) {
 
             {activeTab === 'schemas' && org && (
                <div className="animate-fadeIn">
-                  <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+                  <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }} className="grid-mobile-stack">
                      <button className={activeSchema === 'student' ? 'btn-primary' : 'btn-logout'} onClick={() => setActiveSchema('student')}>Student Model</button>
                      <button className={activeSchema === 'instructor' ? 'btn-primary' : 'btn-logout'} onClick={() => setActiveSchema('instructor')}>Instructor Model</button>
                   </div>
@@ -1301,7 +1314,7 @@ function ManagerDashboard({ token, logout }) {
                   <div className="dashboard-card">
                      <h3>{activeSchema.toUpperCase()} Schema Designer</h3>
                      <div style={{ marginTop: '1.5rem', marginBottom: '2rem' }}>
-                        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+                        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }} className="grid-mobile-stack">
                            <input value={newFieldName} onChange={e => setNewFieldName(e.target.value)} placeholder="Field Label (e.g. Department or Blood Group)" style={{ flex: 2 }} />
                            <select value={newFieldType} onChange={e => setNewFieldType(e.target.value)} style={{ flex: 1 }}>
                               <option value="text">Short Text</option>
@@ -1356,14 +1369,14 @@ function ManagerDashboard({ token, logout }) {
                      </div>
                   ) : (
                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                           <div style={{ display: 'flex', gap: '1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }} className="grid-mobile-stack">
+                           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                               <button onClick={() => setShowAddStudent(true)} className="btn-primary">New Student Record</button>
                               <button className="btn-secondary" onClick={() => window.open(`${API_BASE_URL}/api/students/download_template/?organization=${org.id}`)}>Get Template</button>
                               <button className="btn-secondary" onClick={() => document.getElementById('student-import').click()}>Import CSV</button>
                               <input id="student-import" type="file" hidden accept=".csv" onChange={e => handleBulkImport('student', e.target.files[0])} />
                            </div>
-                           <div className="search-container" style={{ maxWidth: '400px' }}>
+                           <div className="search-container" style={{ maxWidth: '400px', width: '100%' }}>
                               <i className="fas fa-search"></i>
                               <input
                                  placeholder="Search Students..."
@@ -1372,8 +1385,8 @@ function ManagerDashboard({ token, logout }) {
                               />
                            </div>
                         </div>
-                        <div className="dashboard-card">
-                           <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'separate', borderSpacing: '0 0.5rem' }}>
+                        <div className="dashboard-card" style={{ padding: '0' }}>
+                           <table className="responsive-table" style={{ width: '100%', textAlign: 'left', borderCollapse: 'separate', borderSpacing: '0 0.5rem' }}>
                               <thead>
                                  <tr style={{ opacity: 0.5 }}>
                                     {org.student_fields_config?.slice(0, 3).map(f => <th key={f.id} style={{ padding: '1rem' }}>{f.name}</th>)}
@@ -1387,13 +1400,13 @@ function ManagerDashboard({ token, logout }) {
                                  ).map(s => (
                                     <tr key={s.id} style={{ background: 'rgba(255,255,255,0.02)' }}>
                                        {org.student_fields_config?.slice(0, 3).map((f, idx) => (
-                                          <td key={f.id} style={{ padding: '1rem', borderRadius: idx === 0 ? '12px 0 0 12px' : '0' }}>{s.custom_data?.[f.name] || '-'}</td>
+                                          <td key={f.id} data-label={f.name} style={{ padding: '1rem', borderRadius: idx === 0 ? '12px 0 0 12px' : '0' }}>{s.custom_data?.[f.name] || '-'}</td>
                                        ))}
-                                       <td style={{ padding: '1rem' }}>
+                                       <td style={{ padding: '1rem' }} data-label="Portal Login">
                                           <div style={{ fontSize: '0.75rem', opacity: 0.6 }}>User: <strong>{s.user_username || 'N/A'}</strong></div>
                                           <div style={{ fontSize: '0.75rem', opacity: 0.4 }}>Default: Pass@{s.registration_number}</div>
                                        </td>
-                                       <td style={{ padding: '1rem', textAlign: 'right', borderRadius: '0 12px 12px 0' }}>
+                                       <td style={{ padding: '1rem', textAlign: 'right', borderRadius: '0 12px 12px 0' }} data-label="Actions">
                                           <button className="btn-secondary" style={{ padding: '0.4rem 0.6rem' }} onClick={() => { setEditingStudent(s); setStudentForm({ custom_data: s.custom_data }); setShowAddStudent(true); }}>Edit</button>
                                           <button onClick={async () => {
                                              if (!window.confirm("Permanently archive student record?")) return;
@@ -1415,14 +1428,14 @@ function ManagerDashboard({ token, logout }) {
 
             {activeTab === 'instructors' && org && (
                <div className="animate-fadeIn">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                     <div style={{ display: 'flex', gap: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }} className="grid-mobile-stack">
+                     <div style={{ display: 'flex', gap: '1rem' }} className="grid-mobile-stack">
                         <button onClick={() => setShowAddInstructor(true)} className="btn-primary">Add New Instructor</button>
                         <button className="btn-secondary" onClick={() => window.open(`${API_BASE_URL}/api/instructors/download_template/?organization=${org.id}`)}>Download Template</button>
                         <button className="btn-secondary" onClick={() => document.getElementById('instructor-import').click()}>Import CSV</button>
                         <input id="instructor-import" type="file" hidden accept=".csv" onChange={e => handleBulkImport('instructor', e.target.files[0])} />
                      </div>
-                     <div className="search-container" style={{ maxWidth: '400px' }}>
+                     <div className="search-container" style={{ maxWidth: '400px', width: '100%' }}>
                         <i className="fas fa-search"></i>
                         <input
                            placeholder="Search Staff..."
@@ -1431,7 +1444,7 @@ function ManagerDashboard({ token, logout }) {
                         />
                      </div>
                   </div>
-                  <div className="dashboard-card" style={{ overflowX: 'auto' }}>
+                  <div className="dashboard-card" style={{ padding: '0' }}>
                      <table className="responsive-table" style={{ width: '100%', textAlign: 'left', borderCollapse: 'separate', borderSpacing: '0 0.5rem' }}>
                         <thead>
                            <tr style={{ opacity: 0.5 }}>
@@ -1446,13 +1459,13 @@ function ManagerDashboard({ token, logout }) {
                            ).map(inst => (
                               <tr key={inst.id} style={{ background: 'rgba(255,255,255,0.02)' }}>
                                  {org.instructor_fields_config?.slice(0, 3).map((f, idx) => (
-                                    <td key={f.id} style={{ padding: '1rem', borderRadius: idx === 0 ? '12px 0 0 12px' : '0' }}>{inst.custom_data?.[f.name] || '-'}</td>
+                                    <td key={f.id} data-label={f.name} style={{ padding: '1rem' }}>{inst.custom_data?.[f.name] || '-'}</td>
                                  ))}
-                                 <td style={{ padding: '1rem' }}>
+                                 <td style={{ padding: '1rem' }} data-label="Staff Login">
                                     <div style={{ fontSize: '0.75rem', opacity: 0.6 }}>User: <strong>{inst.user_username || 'N/A'}</strong></div>
                                     <div style={{ fontSize: '0.75rem', opacity: 0.4 }}>Default: Pass@{inst.registration_number}</div>
                                  </td>
-                                 <td style={{ padding: '1rem', textAlign: 'right', borderRadius: '0 12px 12px 0' }}>
+                                 <td style={{ padding: '1rem', textAlign: 'right' }} data-label="Actions">
                                     <button className="btn-secondary" style={{ padding: '0.4rem 0.6rem' }} onClick={() => {
                                        setEditingInstructor(inst);
                                        const taught = subjects.filter(s => s.instructors?.includes(inst.id)).map(s => s.id);
@@ -1476,7 +1489,7 @@ function ManagerDashboard({ token, logout }) {
 
             {activeTab === 'profile' && org && (
                <div className="animate-fadeIn">
-                  <div style={{ display: 'flex', gap: '2rem' }}>
+                  <div style={{ display: 'flex', gap: '2rem' }} className="grid-mobile-stack">
                      {/* Profile Column */}
                      <div className="dashboard-card" style={{ flex: 1 }}>
                         <h3>Organization Information</h3>
@@ -1484,6 +1497,22 @@ function ManagerDashboard({ token, logout }) {
                         <form style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.2rem', marginTop: '1.5rem' }}>
                            <div className="form-group"><label>Name</label><input value={org.name || ''} onChange={e => setOrg({ ...org, name: e.target.value })} /></div>
                            <div className="form-group"><label>Primary Contact</label><input value={org.contact_email || ''} onChange={e => setOrg({ ...org, contact_email: e.target.value })} /></div>
+                           <div className="form-group">
+                              <label>Webhook URL (Daily Task Notifications)</label>
+                              <input 
+                                 value={org.webhook_url || ''} 
+                                 onChange={async (e) => {
+                                    const url = e.target.value;
+                                    await fetch(`${API_BASE_URL}/api/organizations/${org.id}/`, {
+                                       method: 'PATCH',
+                                       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                       body: JSON.stringify({ webhook_url: url })
+                                    });
+                                    fetchItems();
+                                 }} 
+                                 placeholder="https://your-webhook-target.com/api/tasks" 
+                              />
+                           </div>
                            <div className="form-group"><label>Portal Access</label><div className={`badge ${org.has_portal_access ? 'badge-success' : 'badge-warning'}`} style={{ display: 'inline-block' }}>{org.has_portal_access ? 'ENABLED' : 'DISABLED'}</div></div>
                         </form>
                      </div>
@@ -1496,7 +1525,7 @@ function ManagerDashboard({ token, logout }) {
                         </div>
                         <p style={{ fontSize: '0.85rem', opacity: 0.6, marginBottom: '2rem' }}>Configure global hours and define specific intervals/breaks.</p>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '2rem' }} className="stat-grid">
                            <div className="form-group">
                               <label>School Starts At</label>
                               <input type="time" value={org.school_start_time || ''} onChange={async (e) => {
@@ -1585,8 +1614,8 @@ function ManagerDashboard({ token, logout }) {
             )}
 
             {showAddStudent && (
-               <div className="modal-overlay" style={{ background: 'rgba(0,0,0,0.85)', position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
-                  <div className="dashboard-card animate-slideUp" style={{ width: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
+               <div className="modal-overlay" style={{ background: 'rgba(0,0,0,0.85)', position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }}>
+                  <div className="dashboard-card animate-slideUp" style={{ width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                         <h3 className="nav-brand" style={{ fontSize: '1.8rem' }}>{editingStudent ? 'Edit Record' : 'New Record'}</h3>
                         <button onClick={() => { setShowAddStudent(false); setEditingStudent(null); }} style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
@@ -1602,7 +1631,7 @@ function ManagerDashboard({ token, logout }) {
 
                         {org.student_fields_config?.length > 0 ? (
                            <div style={{ marginTop: '1rem' }}>
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }} className="grid-mobile-stack">
                                  {org.student_fields_config.map(field => (
                                     <div key={field.id} className="form-group">
                                        <label>{field.name}</label>
@@ -1635,8 +1664,8 @@ function ManagerDashboard({ token, logout }) {
             )}
 
             {showAddInstructor && (
-               <div className="modal-overlay" style={{ background: 'rgba(0,0,0,0.85)', position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
-                  <div className="dashboard-card animate-slideUp" style={{ width: '600px' }}>
+               <div className="modal-overlay" style={{ background: 'rgba(0,0,0,0.85)', position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }}>
+                  <div className="dashboard-card animate-slideUp" style={{ width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                         <h3 className="nav-brand" style={{ fontSize: '1.8rem' }}>{editingInstructor ? 'Edit Profile' : 'New Instructor'}</h3>
                         <button onClick={() => { setShowAddInstructor(false); setEditingInstructor(null); setInstructorForm({ subjects: [], classrooms: [], custom_data: {} }); }} style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
@@ -1644,7 +1673,7 @@ function ManagerDashboard({ token, logout }) {
                      <form onSubmit={handleCreateOrUpdateInstructor}>
                         <div className="form-group" style={{ marginBottom: '1.5rem' }}>
                            <label>Responsibilities (Taught Subjects)</label>
-                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px' }}>
+                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px' }} className="grid-mobile-stack">
                               {subjects.length > 0 ? (
                                  subjects.map(s => (
                                     <label key={s.id} style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
@@ -1669,7 +1698,7 @@ function ManagerDashboard({ token, logout }) {
 
                         <div className="form-group" style={{ marginBottom: '1.5rem' }}>
                            <label>Classroom Association (Teacher Access)</label>
-                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px' }}>
+                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px' }} className="grid-mobile-stack">
                               {classrooms.map(c => (
                                  <label key={c.id} style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
                                     <input
@@ -1690,7 +1719,7 @@ function ManagerDashboard({ token, logout }) {
 
                         {org.instructor_fields_config?.length > 0 ? (
                            <div style={{ marginTop: '1rem' }}>
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }} className="grid-mobile-stack">
                                  {org.instructor_fields_config.map(field => (
                                     <div key={field.id} className="form-group">
                                        <label>{field.name}</label>
@@ -1718,8 +1747,8 @@ function ManagerDashboard({ token, logout }) {
             )}
 
             {viewingSubject && (
-               <div className="modal-overlay" style={{ background: 'rgba(0,0,0,0.85)', position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
-                  <div className="dashboard-card animate-slideUp" style={{ width: '500px' }}>
+               <div className="modal-overlay" style={{ background: 'rgba(0,0,0,0.85)', position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }}>
+                  <div className="dashboard-card animate-slideUp" style={{ width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto' }}>
                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                         <h3 className="nav-brand" style={{ fontSize: '1.5rem' }}>Faculty Assignment</h3>
                         <button onClick={() => setViewingSubject(null)} style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
@@ -1824,6 +1853,7 @@ function DailyMonitoringView({ token }) {
       const [showAddTask, setShowAddTask] = useState(false);
       const [subjects, setSubjects] = useState([]);
       const [newTask, setNewTask] = useState({ topic: '', category: 'HW', subject: '', deadline: '', description: '' });
+      const [editingTask, setEditingTask] = useState(null);
 
       const fetchTasks = () => {
          fetch(`${API_BASE_URL}/api/daily_tasks/?classroom=${classroomId}&date=${date}`, { headers: { 'Authorization': `Bearer ${token}` } })
@@ -1840,10 +1870,14 @@ function DailyMonitoringView({ token }) {
          }
       }, [classroomId, date, token]);
 
-      const handleAddTask = async (e) => {
+      const handleSaveTask = async (e) => {
          e.preventDefault();
-         const res = await fetch(`${API_BASE_URL}/api/daily_tasks/`, {
-            method: 'POST',
+         const isUpdate = !!editingTask;
+         const url = isUpdate ? `${API_BASE_URL}/api/daily_tasks/${editingTask.id}/` : `${API_BASE_URL}/api/daily_tasks/`;
+         const method = isUpdate ? 'PATCH' : 'POST';
+
+         const res = await fetch(url, {
+            method,
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
             body: JSON.stringify({ 
                ...newTask, 
@@ -1854,20 +1888,33 @@ function DailyMonitoringView({ token }) {
          });
          if (res.ok) {
             setShowAddTask(false);
+            setEditingTask(null);
             setNewTask({ topic: '', category: 'HW', subject: '', deadline: '', description: '' });
             fetchTasks();
          } else {
             const errDetails = await res.json();
-            console.error("Task Creation Error:", errDetails);
-            alert("Failed to create task: " + (errDetails.deadline?.[0] || errDetails.subject?.[0] || JSON.stringify(errDetails)));
+            alert("Failed to save task: " + (errDetails.deadline?.[0] || errDetails.subject?.[0] || JSON.stringify(errDetails)));
+         }
+      };
+
+      const handleDeleteTask = async (taskId) => {
+         if (!window.confirm("Permanently delete this task slot?")) return;
+         const res = await fetch(`${API_BASE_URL}/api/daily_tasks/${taskId}/`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+         });
+         if (res.ok) {
+            fetchTasks();
+         } else {
+            alert("Failed to delete task.");
          }
       };
 
       return (
          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }} className="grid-mobile-stack">
             <div>
-               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                  <h3>Tasks for {new Date(date).toLocaleDateString()}</h3>
+               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }} className="grid-mobile-stack">
+                  <h3 style={{ margin: 0 }}>Tasks for {new Date(date).toLocaleDateString()}</h3>
                   {role === 'INSTRUCTOR' && <button className="btn-primary" onClick={() => setShowAddTask(true)}>New Slot</button>}
                </div>
                <div className="dashboard-card" style={{ border: '1px solid var(--border-color)', minHeight: '400px' }}>
@@ -1877,7 +1924,15 @@ function DailyMonitoringView({ token }) {
                            <div key={t.id} style={{ padding: '1.2rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', borderLeft: `4px solid ${t.category === 'HW' ? '#FACC15' : (t.category === 'CW' ? '#60A5FA' : '#C084FC')}` }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                                  <span className="badge" style={{ fontSize: '0.7rem' }}>{t.category_display}</span>
-                                 <span style={{ fontSize: '0.8rem', opacity: 0.5 }}>{t.subject_name}</span>
+                                 <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.8rem', opacity: 0.5 }}>{t.subject_name}</span>
+                                    {role === 'INSTRUCTOR' && (
+                                       <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                          <button onClick={() => { setEditingTask(t); setNewTask({ topic: t.topic, category: t.category, subject: t.subject, deadline: t.deadline ? t.deadline.slice(0, 16) : '', description: t.description }); setShowAddTask(true); }} style={{ background: 'transparent', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', fontSize: '0.9rem' }} title="Edit Task"><i className="fas fa-edit"></i></button>
+                                          <button onClick={() => handleDeleteTask(t.id)} style={{ background: 'transparent', border: 'none', color: '#EF4444', cursor: 'pointer', fontSize: '0.9rem' }} title="Delete Task"><i className="fas fa-trash"></i></button>
+                                       </div>
+                                    )}
+                                 </div>
                               </div>
                               <h4 style={{ margin: '0 0 0.5rem 0' }}>{t.topic}</h4>
                               {t.description && <p style={{ fontSize: '0.85rem', opacity: 0.7, marginBottom: '0.5rem' }}>{t.description}</p>}
@@ -1913,13 +1968,13 @@ function DailyMonitoringView({ token }) {
             </div>
 
             {showAddTask && (
-               <div className="modal-overlay" style={{ background: 'rgba(0,0,0,0.85)', position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
-                  <div className="dashboard-card animate-slideUp" style={{ width: '500px' }}>
+               <div className="modal-overlay" style={{ background: 'rgba(0,0,0,0.85)', position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '1rem' }}>
+                  <div className="dashboard-card animate-slideUp" style={{ width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto' }}>
                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                        <h3 className="nav-brand" style={{ fontSize: '1.5rem' }}>Add New Slot</h3>
-                        <button onClick={() => setShowAddTask(false)} style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
+                        <h3 className="nav-brand" style={{ fontSize: '1.5rem' }}>{editingTask ? 'Edit Task Slot' : 'Add New Slot'}</h3>
+                        <button onClick={() => { setShowAddTask(false); setEditingTask(null); setNewTask({ topic: '', category: 'HW', subject: '', deadline: '', description: '' }); }} style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
                      </div>
-                     <form onSubmit={handleAddTask}>
+                     <form onSubmit={handleSaveTask}>
                         <div className="form-group" style={{ marginBottom: '1rem' }}>
                            <label>Subject</label>
                            <select required value={newTask.subject} onChange={e => setNewTask({ ...newTask, subject: e.target.value })}>
@@ -1931,7 +1986,7 @@ function DailyMonitoringView({ token }) {
                            <label>Topic</label>
                            <input required value={newTask.topic} onChange={e => setNewTask({ ...newTask, topic: e.target.value })} placeholder="e.g. Algebra Fundamentals" />
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }} className="grid-mobile-stack">
                            <div className="form-group">
                               <label>Category</label>
                               <select value={newTask.category} onChange={e => setNewTask({ ...newTask, category: e.target.value })}>
@@ -2032,14 +2087,14 @@ function DailyMonitoringView({ token }) {
 
       return (
          <div className="dashboard animate-fadeIn">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }} className="grid-mobile-stack">
                <div>
-                  <h2 style={{ fontSize: '2.25rem' }}>Student <span className="nav-brand" style={{ fontSize: '2.25rem' }}>Learning Hub</span></h2>
-                  {studentProfile && <p style={{ opacity: 0.7 }}>Welcome, {studentProfile.first_name}! Access your daily schedule and materials for <strong>{studentProfile.classroom_name}</strong>.</p>}
+                  <h2 style={{ margin: 0 }}>Student <span className="nav-brand" style={{ fontSize: 'inherit' }}>Learning Hub</span></h2>
+                  {studentProfile && <p style={{ opacity: 0.7, margin: '0.5rem 0 0 0' }}>Welcome, {studentProfile.first_name}! Access your daily schedule and materials for <strong>{studentProfile.classroom_name}</strong>.</p>}
                </div>
-               <div className="form-group">
+               <div className="form-group" style={{ marginBottom: 0 }}>
                   <label>Filter Date</label>
-                  <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)' }} />
+                  <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', width: '100%' }} />
                </div>
             </div>
 
