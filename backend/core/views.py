@@ -192,7 +192,13 @@ class StudentViewSet(viewsets.ModelViewSet):
             instructor = getattr(user, 'instructor_profile', None)
             if instructor:
                 from django.db.models import Q
-                return qs.filter(Q(classroom__instructors=instructor) | Q(classroom__subjects__instructors=instructor)).distinct()
+                qs = qs.filter(Q(classroom__instructors=instructor) | Q(classroom__subjects__instructors=instructor)).distinct()
+                
+                # Apply specific classroom filter if provided in query params
+                room_id = get_query_param(self.request, 'classroom')
+                if room_id:
+                    qs = qs.filter(classroom_id=room_id)
+                return qs
         
         if user.role == 'STUDENT':
             student = getattr(user, 'student_profile', None)
@@ -276,6 +282,24 @@ class StudentViewSet(viewsets.ModelViewSet):
         instance.delete()
         if user:
             user.delete()
+
+    @action(detail=True, methods=['POST'])
+    def revoke(self, request, pk=None):
+        instance = self.get_object()
+        if instance.user:
+            instance.user.is_active = False
+            instance.user.save()
+            return Response({'status': 'access revoked'})
+        return Response({'error': 'no associated user'}, status=400)
+
+    @action(detail=True, methods=['POST'])
+    def activate(self, request, pk=None):
+        instance = self.get_object()
+        if instance.user:
+            instance.user.is_active = True
+            instance.user.save()
+            return Response({'status': 'access restored'})
+        return Response({'error': 'no associated user'}, status=400)
             
 class TimetableViewSet(viewsets.ModelViewSet):
     serializer_class = TimetableSerializer
@@ -343,6 +367,32 @@ class InstructorViewSet(viewsets.ModelViewSet):
         instance.delete()
         if user:
             user.delete()
+
+    @action(detail=True, methods=['POST'])
+    def revoke(self, request, pk=None):
+        instance = self.get_object()
+        if instance.user:
+            # 1. Disable Login
+            instance.user.is_active = False
+            instance.user.save()
+            
+            # 2. Clear Associations (Remove from active duty)
+            # We keep DailyTasks and materials (ForeignKeys) because they belong to the record,
+            # but we remove them from active subject/classroom rosters (ManyToMany)
+            instance.taught_subjects.clear()
+            instance.classrooms.clear()
+            
+            return Response({'status': 'access revoked and responsibilities cleared'})
+        return Response({'error': 'no associated user'}, status=400)
+
+    @action(detail=True, methods=['POST'])
+    def activate(self, request, pk=None):
+        instance = self.get_object()
+        if instance.user:
+            instance.user.is_active = True
+            instance.user.save()
+            return Response({'status': 'access restored'})
+        return Response({'error': 'no associated user'}, status=400)
 
     def perform_create(self, serializer):
         user_data = self.request.data.get('user_data', {})

@@ -5,6 +5,16 @@ from rest_framework.exceptions import AuthenticationFailed
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
+        # We check for active status manually to provide the specific "Access Revoked" message
+        try:
+            user = User.objects.filter(username=attrs.get('username')).first()
+            if user and not user.is_active:
+                raise AuthenticationFailed("Access Revoked: Your portal access has been suspended by the administrator.")
+        except AuthenticationFailed:
+            raise
+        except Exception:
+            pass
+
         data = super().validate(attrs)
         user = self.user
         
@@ -70,6 +80,7 @@ class SubjectSerializer(serializers.ModelSerializer):
 
 class InstructorSerializer(serializers.ModelSerializer):
     user_username = serializers.ReadOnlyField(source='user.username')
+    user_is_active = serializers.ReadOnlyField(source='user.is_active')
     class Meta:
         model = Instructor
         fields = '__all__'
@@ -78,6 +89,7 @@ class InstructorSerializer(serializers.ModelSerializer):
 class StudentSerializer(serializers.ModelSerializer):
     classroom_name = serializers.ReadOnlyField(source='classroom.name')
     user_username = serializers.ReadOnlyField(source='user.username')
+    user_is_active = serializers.ReadOnlyField(source='user.is_active')
     generated_username = serializers.CharField(read_only=True, required=False)
     generated_password = serializers.CharField(read_only=True, required=False)
     class Meta:
@@ -86,9 +98,16 @@ class StudentSerializer(serializers.ModelSerializer):
         read_only_fields = ('user',)
 
 class TimetableSerializer(serializers.ModelSerializer):
+    subject_name = serializers.ReadOnlyField(source='subject.name')
+    instructor_name = serializers.SerializerMethodField()
     class Meta:
         model = Timetable
         fields = '__all__'
+    
+    def get_instructor_name(self, obj):
+        if not obj.instructor: return "Unassigned"
+        i = obj.instructor
+        return str(list(i.custom_data.values())[0]) if i.custom_data else str(i.registration_number)
 
 class ClassSessionSerializer(serializers.ModelSerializer):
     class Meta:

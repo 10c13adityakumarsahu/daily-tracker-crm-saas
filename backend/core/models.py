@@ -90,6 +90,7 @@ class Student(models.Model):
 class Timetable(models.Model):
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='timetables')
+    instructor = models.ForeignKey(Instructor, on_delete=models.SET_NULL, null=True, blank=True, related_name='timetables')
     day_of_week = models.IntegerField(choices=[(i, i) for i in range(7)]) # 0=Monday
     start_time = models.TimeField()
     end_time = models.TimeField()

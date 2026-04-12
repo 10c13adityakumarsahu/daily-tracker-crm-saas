@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { Routes, Route, Link, useNavigate } from 'react-router-dom';
+import LandingPage from './LandingPage';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -20,7 +22,9 @@ function App() {
 
    useEffect(() => {
       if (!token) {
-         if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
+         // Allow root path (Landing Page), login, and signup without token
+         const publicPaths = ['/', '/login', '/signup'];
+         if (!publicPaths.includes(window.location.pathname)) {
             navigate('/login');
          }
       }
@@ -33,18 +37,29 @@ function App() {
       navigate('/login');
    };
 
+   const isLanding = window.location.pathname === '/';
+
    return (
       <div className="app-container">
+         {!token && isLanding && (
+            <nav className="navbar landing-nav">
+               <div className="nav-brand">DailyTracker <span style={{ fontWeight: 200, opacity: 0.6 }}>SaaS</span></div>
+               <div className="nav-links">
+                  <Link to="/login">Login</Link>
+                  <Link to="/signup" className="btn-primary" style={{ padding: '0.5rem 1.25rem' }}>Get Started</Link>
+               </div>
+            </nav>
+         )}
+
          {token && (
             <nav className="navbar">
                <div className="nav-brand">DailyTracker <span style={{ fontWeight: 200, opacity: 0.6 }}>SaaS</span></div>
                <div className={`nav-links ${mobileMenuOpen ? 'mobile-show' : ''}`}>
-                  <Link to="/" onClick={() => setMobileMenuOpen(false)} className={window.location.pathname === '/' ? 'active' : ''}>Dashboard</Link>
+                  <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)} className={window.location.pathname === '/dashboard' ? 'active' : ''}>Dashboard</Link>
                   <button onClick={() => { logout(); setMobileMenuOpen(false); }} className="btn-logout">
                      <i className="fas fa-sign-out-alt"></i> Logout
                   </button>
                </div>
-               {/* Show navbar hamburger only if NOT a manager, as managers have their own sidebar toggle */}
                {role !== 'MANAGER' && (
                   <button className="navbar-hamburger" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
                      <i className={`fas ${mobileMenuOpen ? 'fa-times' : 'fa-bars'}`}></i>
@@ -53,37 +68,37 @@ function App() {
             </nav>
          )}
 
-         <main className="main-content">
+         <main className={isLanding ? "landing-main" : "main-content"}>
             <Routes>
+               <Route path="/" element={<LandingPage />} />
                <Route path="/login" element={<Login setToken={setToken} setRole={setRole} />} />
                <Route path="/signup" element={<Signup />} />
-               <Route path="/" element={token ? <Dashboard role={role} token={token} logout={logout} /> : <LandingPage />} />
+               <Route path="/dashboard" element={token ? <Dashboard role={role} token={token} logout={logout} /> : <Login setToken={setToken} setRole={setRole} />} />
+               <Route path="*" element={<NotFound />} />
             </Routes>
          </main>
       </div>
    );
 }
 
-function LandingPage() {
+
+function NotFound() {
    const navigate = useNavigate();
    return (
-      <div className="landing-page animate-fadeIn" style={{ textAlign: 'center', padding: '6rem 0' }}>
-         <div className="badge-success" style={{ display: 'inline-block', padding: '0.4rem 1.2rem', marginBottom: '2rem' }}>NEW: Enterprise Ready 🚀</div>
-         <h1 style={{ fontSize: '4.5rem', fontWeight: 900, letterSpacing: '-2px', marginBottom: '1.5rem' }}>
-            Master Your <span className="nav-brand" style={{ fontSize: '4.5rem' }}>Educational</span> Workflow.
-         </h1>
-         <p style={{ fontSize: '1.25rem', color: 'var(--text-muted)', maxWidth: '700px', margin: '0 auto 3rem' }}>
-            The only SaaS platform built for high-performance learning organizations to manage students, staff, and analytics with surgical precision.
-         </p>
-         <div style={{ display: 'flex', gap: '1.5rem', justifyContent: 'center' }}>
-            <button className="btn-primary" style={{ padding: '1.2rem 2.5rem', fontSize: '1.2rem' }} onClick={() => navigate('/signup')}>Start Free Trial</button>
-            <button className="btn-secondary" style={{ padding: '1.2rem 2.5rem', fontSize: '1.2rem' }} onClick={() => navigate('/login')}>Sign In to Dashboard</button>
-         </div>
-         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2.5rem', marginTop: '6rem' }}>
-            <div className="stat-card" style={{ border: '1px solid var(--border-color)' }}><h3>Custom Fields</h3><p>Design your own data schema for students and instructors in seconds.</p></div>
-            <div className="stat-card" style={{ border: '1px solid var(--border-color)' }}><h3>Bulk Control</h3><p>Onboard hundreds of users instantly via our intelligent CSV mapping tool.</p></div>
-            <div className="stat-card" style={{ border: '1px solid var(--border-color)' }}><h3>Smart Reports</h3><p>Gain insights with automated attendance and academic session logging.</p></div>
-         </div>
+      <div className="not-found-container" style={{ textAlign: 'center', padding: '10rem 2rem' }}>
+         <motion.div 
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="glass-card"
+            style={{ maxWidth: '600px', margin: '0 auto', padding: '5rem' }}
+         >
+            <h1 style={{ fontSize: '8rem', margin: 0, background: 'linear-gradient(135deg, #134E4A, #9D174D)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>404</h1>
+            <h2 style={{ fontSize: '2rem', marginBottom: '1rem' }}>Page Lost in Orbit</h2>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '3rem', fontSize: '1.2rem' }}>
+               The page you are looking for doesn't exist or has been moved to another dimension.
+            </p>
+            <button className="btn-primary" onClick={() => navigate('/')}>Return to Base</button>
+         </motion.div>
       </div>
    );
 }
@@ -112,7 +127,7 @@ function Login({ setToken, setRole }) {
             localStorage.setItem('role', realRole);
             setRole(realRole);
             localStorage.setItem('has_portal_access', !!data.has_portal_access);
-            navigate('/');
+            navigate('/dashboard');
          } else {
             alert(data.detail || data.error || 'Login failed: Invalid credentials');
          }
@@ -359,7 +374,7 @@ function ManagerDashboard({ token, logout }) {
    const [newFieldOptions, setNewFieldOptions] = useState('');
 
    const [selectedClassId, setSelectedClassId] = useState(null);
-   const [classDetails, setClassDetails] = useState({ subjects: [], students: [], timetable: [], sessions: [], homework: [] });
+   const [classDetails, setClassDetails] = useState({ subjects: [], students: [], timetable: [], sessions: [], homework: [], dailyTasks: [] });
    const [newSubject, setNewSubject] = useState({ name: '', id: '', instructors: [] });
    const [viewingSubject, setViewingSubject] = useState(null);
    const [courseSearch, setCourseSearch] = useState('');
@@ -367,6 +382,9 @@ function ManagerDashboard({ token, logout }) {
    const [studentSearch, setStudentSearch] = useState('');
    const [instructorSearch, setInstructorSearch] = useState('');
    const [newInterval, setNewInterval] = useState({ name: '', start: '', end: '' });
+   const [showTimetable, setShowTimetable] = useState(false);
+   const [monitoringDate, setMonitoringDate] = useState(new Date().toISOString().split('T')[0]);
+   const [selectedScheduleDay, setSelectedScheduleDay] = useState(0); // 0 = Mon
 
    const [studentForm, setStudentForm] = useState({
       classroom: '',
@@ -544,14 +562,15 @@ function ManagerDashboard({ token, logout }) {
 
    const fetchClassroomDetails = async (cid) => {
       if (!cid || cid === 'undefined') return;
-      const [subRes, stuRes, ttRes, sesRes, hwRes] = await Promise.all([
+      const [subRes, stuRes, ttRes, sesRes, hwRes, taskRes] = await Promise.all([
          fetch(`${API_BASE_URL}/api/subjects/?classroom=${cid}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
          fetch(`${API_BASE_URL}/api/students/?classroom=${cid}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
          fetch(`${API_BASE_URL}/api/timetables/?classroom=${cid}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
          fetch(`${API_BASE_URL}/api/sessions/?classroom=${cid}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
          fetch(`${API_BASE_URL}/api/homeworks/?classroom=${cid}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
+         fetch(`${API_BASE_URL}/api/daily_tasks/?classroom=${cid}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json()),
       ]);
-      setClassDetails({ subjects: subRes, students: stuRes, timetable: ttRes, sessions: sesRes, homework: hwRes });
+      setClassDetails({ subjects: subRes, students: stuRes, timetable: ttRes, sessions: sesRes, homework: hwRes, dailyTasks: taskRes });
    }
 
    const fetchMasterData = async () => {
@@ -574,24 +593,44 @@ function ManagerDashboard({ token, logout }) {
          endMins: parseInt(ci.end.split(':')[0]) * 60 + parseInt(ci.end.split(':')[1]),
       })).sort((a, b) => a.startMins - b.startMins);
 
+      const periodDuration = parseInt(org.period_duration_minutes) || 45;
+      if (periodDuration <= 0) return [];
+
       let pNum = 1;
       let guard = 0;
       while (currentMins < endMins && guard < 100) {
          guard++;
-         const currentTimeStr = `${String(Math.floor(currentMins / 60)).padStart(2, '0')}:${String(currentMins % 60).padStart(2, '0')}`;
-         const matchingCI = custom.find(ci => ci.start === currentTimeStr);
+         const h = Math.floor(currentMins / 60);
+         const m = currentMins % 60;
+         const currentTimeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+         
+         // Search for ANY custom interval that starts at or BEFORE current time and ends AFTER
+         const activeCI = custom.find(ci => ci.startMins <= currentMins && ci.endMins > currentMins);
 
-         if (matchingCI) {
-            slots.push({ type: 'BREAK', label: matchingCI.name.toUpperCase(), start: matchingCI.start + ':00', end: matchingCI.end + ':00' });
-            currentMins = matchingCI.endMins;
+         if (activeCI) {
+            slots.push({ type: 'BREAK', label: activeCI.name.toUpperCase(), start: activeCI.start + ':00', end: activeCI.end + ':00' });
+            currentMins = activeCI.endMins;
          } else {
             const sStr = currentTimeStr + ':00';
-            const periodEnd = currentMins + (org.period_duration_minutes || 45);
+            const periodEnd = currentMins + periodDuration;
+            
+            // If the next period would overlap with the start of a custom interval, shorten it or skip?
+            // Usually, we just skip to the next available slot if a break is coming up.
+            const nextCI = custom.find(ci => ci.startMins > currentMins && ci.startMins < periodEnd);
+            
+            if (nextCI) {
+               // We hit a break before the period could finish. Move current time to break start.
+               currentMins = nextCI.startMins;
+               continue; 
+            }
+
             if (periodEnd > endMins) break;
+            
             const eStr = `${String(Math.floor(periodEnd / 60)).padStart(2, '0')}:${String(periodEnd % 60).padStart(2, '0')}:00`;
             slots.push({ type: 'PERIOD', label: `P${pNum++}`, start: sStr, end: eStr });
             currentMins = periodEnd;
 
+            // Auto-break logic for simple setups
             if (custom.length === 0 && pNum - 1 === (org.break_after_period || 3)) {
                const bs = eStr;
                currentMins += (org.break_duration_minutes || 15);
@@ -947,21 +986,45 @@ function ManagerDashboard({ token, logout }) {
 
                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.8rem' }}>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                           {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map(d => (
-                              <div key={d} className="badge" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', cursor: 'not-allowed' }}>{d}</div>
+                           {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map((d, i) => (
+                              <button 
+                                 key={d} 
+                                 onClick={() => setSelectedScheduleDay(i)}
+                                 className="badge" 
+                                 style={{ 
+                                    background: selectedScheduleDay === i ? 'var(--primary-color)' : 'rgba(255,255,255,0.03)', 
+                                    border: '1px solid rgba(255,255,255,0.1)', 
+                                    cursor: 'pointer',
+                                    color: selectedScheduleDay === i ? 'white' : 'inherit'
+                                 }}
+                              >
+                                 {d}
+                              </button>
                            ))}
                         </div>
-                        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.6rem 1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                           <span style={{ fontSize: '0.75rem', fontWeight: 800, opacity: 0.4 }}>DP-DRAG BANK:</span>
-                           <div style={{ display: 'flex', gap: '0.6rem' }}>
-                              {subjects.filter(s => s.instructor).slice(0, 4).map(s => (
-                                 <div key={s.id} draggable onDragStart={(e) => e.dataTransfer.setData('subjectId', s.id)} style={{ padding: '0.4rem 0.8rem', background: 'var(--primary-color)', fontSize: '0.75rem', borderRadius: '6px', fontWeight: 'bold', cursor: 'grab', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
-                                    {s.name}
-                                 </div>
-                              ))}
-                              {subjects.filter(s => s.instructor).length > 4 && <span style={{ opacity: 0.3, fontSize: '0.7rem' }}>+{subjects.filter(s => s.instructor).length - 4} more</span>}
-                           </div>
-                        </div>
+                         <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.6rem 1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 800, opacity: 0.4 }}>FACULTY DEPLOYMENT BANK:</span>
+                             <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                                {subjects.flatMap(s => (s.instructors || []).map(iid => ({ s, iid }))).map(({ s, iid }) => {
+                                   const teacher = instructors.find(i => i.id === iid);
+                                   const tName = teacher ? (Object.values(teacher.custom_data || {})[0] || teacher.registration_number) : '??';
+                                   return (
+                                      <div 
+                                         key={`${s.id}-${iid}`} 
+                                         draggable 
+                                         onDragStart={(e) => {
+                                            e.dataTransfer.setData('subjectId', s.id);
+                                            e.dataTransfer.setData('instructorId', iid);
+                                         }} 
+                                         style={{ padding: '0.4rem 0.8rem', background: 'var(--primary-color)', fontSize: '0.7rem', borderRadius: '6px', fontWeight: 'bold', cursor: 'grab', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}
+                                      >
+                                         {s.name} ({tName})
+                                      </div>
+                                   );
+                                }).slice(0, 8)}
+                                {subjects.flatMap(s => s.instructors).length > 8 && <span style={{ opacity: 0.3, fontSize: '0.7rem' }}>...</span>}
+                             </div>
+                         </div>
                      </div>
                   </div>
 
@@ -985,7 +1048,7 @@ function ManagerDashboard({ token, logout }) {
                                        <div style={{ fontSize: '0.75rem', opacity: 0.4 }}>{slot.start.slice(0, 5)} - {slot.end.slice(0, 5)}</div>
                                     </div>
                                     {classrooms.map(c => {
-                                       const entry = allTimetables.find(t => t.start_time === slot.start && subjects.find(sub => sub.id === t.subject)?.classroom === c.id);
+                                       const entry = allTimetables.find(t => t.day_of_week === selectedScheduleDay && t.start_time === slot.start && subjects.find(sub => sub.id === t.subject)?.classroom === c.id);
                                        const subj = entry ? subjects.find(s => s.id === entry.subject) : null;
                                        const teacher = subj ? instructors.find(i => i.id === subj.instructor) : null;
 
@@ -998,7 +1061,7 @@ function ManagerDashboard({ token, logout }) {
                                                 const res = await fetch(`${API_BASE_URL}/api/timetables/`, {
                                                    method: 'POST',
                                                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                                                   body: JSON.stringify({ organization: org.id, subject: sid, day_of_week: 0, start_time: slot.start, end_time: slot.end })
+                                                   body: JSON.stringify({ organization: org.id, subject: sid, day_of_week: selectedScheduleDay, start_time: slot.start, end_time: slot.end })
                                                 });
                                                 if (res.ok) fetchMasterData();
                                                 else { const err = await res.json(); alert(err.error || "Conflict detected."); }
@@ -1125,105 +1188,48 @@ function ManagerDashboard({ token, logout }) {
                <div className="animate-fadeIn">
                   {selectedClassId ? (
                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
-                           <button onClick={() => setSelectedClassId(null)} className="btn-logout" style={{ padding: '0.4rem 0.8rem' }}><i className="fas fa-chevron-left"></i></button>
-                           <h2 style={{ margin: 0 }}>{classrooms.find(c => c.id === selectedClassId)?.name} <span className="nav-brand" style={{ fontSize: '1rem', marginLeft: '1rem' }}>Institutional Hub</span></h2>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '2rem' }}>
+                           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                              <button onClick={() => { setSelectedClassId(null); setShowTimetable(false); }} className="btn-logout" style={{ padding: '0.4rem 0.8rem' }}><i className="fas fa-chevron-left"></i></button>
+                              <h2 style={{ margin: 0 }}>{classrooms.find(c => c.id === selectedClassId)?.name} <span className="nav-brand" style={{ fontSize: '1rem', marginLeft: '1rem' }}>Institutional Hub</span></h2>
+                           </div>
+                           <button 
+                              onClick={() => setShowTimetable(!showTimetable)} 
+                              className={showTimetable ? "btn-primary" : "btn-secondary"}
+                              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                           >
+                              <i className={showTimetable ? "fas fa-times" : "fas fa-calendar-alt"}></i>
+                              {showTimetable ? "Close Schedule" : "View Time Table"}
+                           </button>
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 3fr', gap: '2rem' }}>
-                           {/* Left Column: People & Metadata */}
-                           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                              <div className="dashboard-card">
-                                 <h4>Subjects & Instructors</h4>
-                                 <p style={{ fontSize: '0.75rem', opacity: 0.5, marginBottom: '1rem' }}>Drag subjects into the grid to schedule them.</p>
-                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                                    {classDetails.subjects.map(s => (
-                                       <div
-                                          key={s.id}
-                                          draggable
-                                          onDragStart={(e) => e.dataTransfer.setData('subjectId', s.id)}
-                                          style={{ padding: '0.8rem', background: 'var(--primary-color)', opacity: 0.8, borderRadius: '8px', cursor: 'grab' }}
-                                       >
-                                          <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{s.name}</div>
-                                          <div style={{ fontSize: '0.75rem', opacity: 0.6 }}>Staff: {s.instructor_names || 'None'}</div>
-                                       </div>
-                                    ))}
-                                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem', marginTop: '0.5rem' }}>
-                                       <label style={{ fontSize: '0.75rem', display: 'block', marginBottom: '0.4rem' }}>Assign Course from Bank</label>
-                                       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                                          <select value={newSubject.id || ""} onChange={e => setNewSubject({ ...newSubject, id: e.target.value })} style={{ fontSize: '0.8rem', flex: 1 }}>
-                                             <option value="">Select Course Blueprint...</option>
-                                             {subjects.filter(s => s.is_template).map(s => (
-                                                <option key={s.id} value={s.id}>{s.name}</option>
-                                             ))}
-                                          </select>
-                                          <button onClick={handleAddSubject} className="btn-primary" style={{ padding: '0.4rem 0.6rem' }}><i className="fas fa-plus"></i></button>
-                                       </div>
-                                    </div>
-                                 </div>
+                        {showTimetable && (
+                           <motion.div 
+                              initial={{ opacity: 0, y: -20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="dashboard-card" 
+                              style={{ marginBottom: '2rem', padding: '0', border: '1px solid var(--primary-color)' }}
+                           >
+                              <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between' }}>
+                                 <h4 style={{ margin: 0 }}>Class Weekly Schedule (Read Only)</h4>
+                                 <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>Instructors listed per slot</span>
                               </div>
-                           </div>
-
-                           <div className="dashboard-card">
-                              <h4>Enrolled Students ({classDetails.students.length})</h4>
-                              <div style={{ maxHeight: '300px', overflowY: 'auto', marginTop: '1rem' }}>
-                                 {classDetails.students.map(stu => (
-                                    <div key={stu.id} style={{ padding: '0.6rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '0.85rem' }}>
-                                       {Object.values(stu.custom_data)[0] || 'Unknown Record'}
-                                    </div>
-                                 ))}
-                              </div>
-                           </div>
-                        </div>
-
-                        {/* Right Column: Interactive Timetable */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                           <div className="dashboard-card" style={{ padding: '0' }}>
-                              <div style={{ padding: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                 <h4>Interactive Timetable Planner</h4>
-                                 <div className="badge badge-success">Drag & Drop Ready</div>
-                              </div>
-                              <div style={{ padding: '1.5rem', overflowX: 'auto' }}>
-                                 <div style={{ display: 'grid', gridTemplateColumns: '80px repeat(5, 1fr)', gap: '1px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                    <div style={{ padding: '1rem', background: 'var(--background-card)' }}></div>
-                                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map(d => <div key={d} style={{ padding: '1rem', background: 'var(--background-card)', textAlign: 'center', fontWeight: 'bold', fontSize: '0.8rem' }}>{d}</div>)}
-
+                              <div style={{ overflowX: 'auto', padding: '0.5rem' }}>
+                                 <div style={{ display: 'grid', gridTemplateColumns: '80px repeat(5, 1fr)', gap: '1px', background: 'rgba(255,255,255,0.05)' }}>
+                                    <div style={{ padding: '0.5rem', background: 'var(--background-card)' }}></div>
+                                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map(d => <div key={d} style={{ padding: '0.5rem', background: 'var(--background-card)', textAlign: 'center', fontWeight: 'bold', fontSize: '0.75rem' }}>{d}</div>)}
                                     {[1, 2, 3, 4, 5].map(period => (
                                        <React.Fragment key={period}>
-                                          <div style={{ padding: '1rem', background: 'var(--background-card)', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.5 }}>P {period}</div>
+                                          <div style={{ padding: '0.5rem', background: 'var(--background-card)', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.5 }}>P{period}</div>
                                           {[0, 1, 2, 3, 4].map(day => {
                                              const entry = classDetails.timetable.find(t => t.day_of_week === day && t.start_time === `${period + 7}:00:00`);
                                              const subject = entry ? classDetails.subjects.find(s => s.id === entry.subject) : null;
                                              return (
-                                                <div
-                                                   key={`${day}-${period}`}
-                                                   onDragOver={(e) => e.preventDefault()}
-                                                   onDrop={async (e) => {
-                                                      const sid = e.dataTransfer.getData('subjectId');
-                                                      const res = await fetch(`${API_BASE_URL}/api/timetables/`, {
-                                                         method: 'POST',
-                                                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                                                         body: JSON.stringify({
-                                                            organization: org.id,
-                                                            subject: sid,
-                                                            day_of_week: day,
-                                                            start_time: `${period + 7}:00:00`,
-                                                            end_time: `${period + 8}:00:00`
-                                                         })
-                                                      });
-                                                      if (res.ok) {
-                                                         fetchClassroomDetails(selectedClassId);
-                                                      } else {
-                                                         const err = await res.json();
-                                                         alert(err.error || "Clash detected or assignment failed.");
-                                                      }
-                                                   }}
-                                                   style={{ padding: '1rem', height: '80px', background: entry ? 'rgba(192,132,252,0.1)' : 'var(--background-card)', border: entry ? '1px solid var(--primary-color)' : 'none', position: 'relative' }}
-                                                >
+                                                <div key={`${day}-${period}`} style={{ padding: '0.5rem', minHeight: '60px', background: entry ? 'rgba(20,184,166,0.05)' : 'var(--background-card)', border: entry ? '1px solid rgba(20,184,166,0.2)' : 'none' }}>
                                                    {subject && (
-                                                      <div style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>
-                                                         {subject.name}
-                                                         <div style={{ fontSize: '0.65rem', opacity: 0.5 }}>{subject.instructor_names}</div>
+                                                      <div style={{ fontSize: '0.7rem' }}>
+                                                         <div style={{ fontWeight: 'bold' }}>{subject.name}</div>
+                                                         <div style={{ fontSize: '0.6rem', opacity: 0.5, marginTop: '2px' }}>{subject.instructor_names}</div>
                                                       </div>
                                                    )}
                                                 </div>
@@ -1233,38 +1239,119 @@ function ManagerDashboard({ token, logout }) {
                                     ))}
                                  </div>
                               </div>
-                           </div>
+                           </motion.div>
+                        )}
 
-                           <div className="dashboard-card" style={{ flex: 1 }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                                 <h4>Academic Progress & Homework</h4>
-                                 <div className="badge">LIVE UPDATES</div>
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                 <div style={{ background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.1)', padding: '1.2rem', borderRadius: '12px' }}>
-                                    <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#34d399', marginBottom: '0.5rem' }}>LATEST TOPIC COVERED</div>
-                                    {classDetails.sessions[0] ? (
-                                       <div>
-                                          <div style={{ fontSize: '1rem' }}>{classDetails.sessions[0].summary}</div>
-                                          <div style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: '0.4rem' }}>Subject: {classDetails.subjects.find(s => s.id === classDetails.sessions[0].subject)?.name || 'General'} • {classDetails.sessions[0].date}</div>
-                                       </div>
-                                    ) : "No sessions logged yet."}
-                                 </div>
-                                 <div style={{ background: 'rgba(236,72,153,0.05)', border: '1px solid rgba(236,72,153,0.1)', padding: '1.2rem', borderRadius: '12px' }}>
-                                    <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#ec4899', marginBottom: '0.5rem' }}>UPCOMING HOMEWORK</div>
-                                    {classDetails.homework.filter(h => new Date(h.deadline) > new Date()).map(hw => (
-                                       <div key={hw.id} style={{ marginBottom: '0.8rem', paddingBottom: '0.8rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                          <div style={{ fontWeight: 'bold' }}>{hw.title}</div>
-                                          <div style={{ fontSize: '0.75rem', opacity: 0.6 }}>Deadline: {new Date(hw.deadline).toLocaleString()}</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 3fr', gap: '2rem' }}>
+                           {/* Left Column: People & Metadata */}
+                           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                              <div className="dashboard-card">
+                                 <h4>Subjects & Instructors</h4>
+                                 <p style={{ fontSize: '0.75rem', opacity: 0.5, marginBottom: '1rem' }}>Active courses assigned from the subject bank.</p>
+                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                                    {classDetails.subjects.map(s => (
+                                       <div
+                                          key={s.id}
+                                          style={{ padding: '0.8rem', background: 'var(--primary-color)', opacity: 0.8, borderRadius: '8px' }}
+                                       >
+                                          <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{s.name}</div>
+                                          <div style={{ fontSize: '0.75rem', opacity: 0.6 }}>Staff: {s.instructor_names || 'None'}</div>
                                        </div>
                                     ))}
-                                    {!classDetails.homework.length && <div style={{ fontSize: '0.85rem', opacity: 0.5 }}>No pending assignments.</div>}
+                                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem', marginTop: '0.5rem' }}>
+                                       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                                       </div>
+                                    </div>
+                                 </div>
+                              </div>
+                              <div className="dashboard-card">
+                                 <h4>Enrolled Students ({classDetails.students.length})</h4>
+                                 <div style={{ maxHeight: '300px', overflowY: 'auto', marginTop: '1rem' }}>
+                                    {classDetails.students.map(stu => (
+                                       <div key={stu.id} style={{ padding: '0.6rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '0.85rem' }}>
+                                          {Object.values(stu.custom_data)[0] || 'Unknown Record'}
+                                       </div>
+                                    ))}
                                  </div>
                               </div>
                            </div>
-                        </div>
-                     </div>
-                  ) : (
+
+                           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                               <div className="dashboard-card" style={{ flex: 1 }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }} className="grid-mobile-stack">
+                                     <div>
+                                        <h4 style={{ margin: 0 }}>Daily Monitoring</h4>
+                                        <p style={{ fontSize: '0.75rem', opacity: 0.5 }}>Insights for the selected period</p>
+                                     </div>
+                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                                        <input 
+                                           type="date" 
+                                           value={monitoringDate} 
+                                           onChange={e => setMonitoringDate(e.target.value)} 
+                                           style={{ fontSize: '0.8rem', padding: '0.4rem', borderRadius: '6px', width: 'auto' }}
+                                        />
+                                        <div className="badge">LIVE</div>
+                                     </div>
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                     {/* Session Logs for Date */}
+                                     <div style={{ background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.1)', padding: '1.2rem', borderRadius: '12px' }}>
+                                        <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#34d399', marginBottom: '0.5rem' }}>SESSIONS LOGGED ({monitoringDate})</div>
+                                        {classDetails.sessions.filter(s => s.date === monitoringDate).length > 0 ? (
+                                           classDetails.sessions.filter(s => s.date === monitoringDate).map(session => (
+                                              <div key={session.id} style={{ marginBottom: '1rem', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                                 <div style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>{session.summary}</div>
+                                                 <div style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: '0.2rem' }}>
+                                                    {classDetails.subjects.find(sub => sub.id === session.subject)?.name || 'General'}
+                                                 </div>
+                                              </div>
+                                           ))
+                                        ) : (
+                                           <div style={{ fontSize: '0.85rem', opacity: 0.5 }}>No sessions recorded for this date.</div>
+                                        )}
+                                     </div>
+
+                                     {/* Daily Tasks / Work for Date */}
+                                     <div style={{ background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.1)', padding: '1.2rem', borderRadius: '12px' }}>
+                                        <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#3b82f6', marginBottom: '0.5rem' }}>CLASSWORK & ASSIGNMENTS</div>
+                                        {classDetails.dailyTasks && classDetails.dailyTasks.filter(t => t.date === monitoringDate).length > 0 ? (
+                                           classDetails.dailyTasks.filter(t => t.date === monitoringDate).map(task => (
+                                              <div key={task.id} style={{ marginBottom: '1rem', paddingBottom: '0.8rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                                    <div>
+                                                       <span style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem', borderRadius: '4px', background: 'rgba(59,130,246,0.2)', color: '#60a5fa', marginRight: '0.5rem' }}>{task.category_display}</span>
+                                                       <span style={{ fontWeight: 'bold', fontSize: '0.95rem' }}>{task.topic}</span>
+                                                    </div>
+                                                 </div>
+                                                 <div style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '0.4rem' }}>{task.description}</div>
+                                                 <div style={{ fontSize: '0.7rem', opacity: 0.5, marginTop: '0.3rem' }}>Subject: {task.subject_name} • By {task.instructor_name}</div>
+                                              </div>
+                                           ))
+                                        ) : (
+                                           <div style={{ fontSize: '0.85rem', opacity: 0.5 }}>No specific tasks or classwork logged.</div>
+                                        )}
+                                     </div>
+                                     
+                                     {/* Homework Due for Date */}
+                                     <div style={{ background: 'rgba(236,72,153,0.05)', border: '1px solid rgba(236,72,153,0.1)', padding: '1.2rem', borderRadius: '12px' }}>
+                                        <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#ec4899', marginBottom: '0.5rem' }}>DEADLINES DUE</div>
+                                        {classDetails.homework.filter(h => h.deadline.startsWith(monitoringDate)).length > 0 ? (
+                                           classDetails.homework.filter(h => h.deadline.startsWith(monitoringDate)).map(hw => (
+                                              <div key={hw.id} style={{ marginBottom: '0.8rem', paddingBottom: '0.8rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                                 <div style={{ fontWeight: 'bold' }}>{hw.title}</div>
+                                                 <div style={{ fontSize: '0.75rem', opacity: 0.6 }}>Time: {new Date(hw.deadline).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                              </div>
+                                           ))
+                                        ) : (
+                                           <div style={{ fontSize: '0.85rem', opacity: 0.5 }}>No homework due on this date.</div>
+                                        )}
+                                     </div>
+                                  </div>
+                               </div>
+                            </div>
+                         </div>
+                      </div>
+                   ) : (
                      <div>
                         <div className="dashboard-card" style={{ marginBottom: '2rem' }}>
                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }} className="grid-mobile-stack">
@@ -1398,21 +1485,58 @@ function ManagerDashboard({ token, logout }) {
                                  {students.filter(s =>
                                     Object.values(s.custom_data || {}).some(v => v.toString().toLowerCase().includes(studentSearch.toLowerCase()))
                                  ).map(s => (
-                                    <tr key={s.id} style={{ background: 'rgba(255,255,255,0.02)' }}>
+                                    <tr key={s.id} style={{ background: s.user_is_active === false ? 'rgba(239, 68, 68, 0.05)' : 'rgba(255,255,255,0.02)', borderLeft: s.user_is_active === false ? '4px solid #EF4444' : 'none' }}>
                                        {org.student_fields_config?.slice(0, 3).map((f, idx) => (
-                                          <td key={f.id} data-label={f.name} style={{ padding: '1rem', borderRadius: idx === 0 ? '12px 0 0 12px' : '0' }}>{s.custom_data?.[f.name] || '-'}</td>
+                                          <td key={f.id} data-label={f.name} style={{ padding: '1rem', borderRadius: idx === 0 ? '12px 0 0 12px' : '0' }}>
+                                             {s.custom_data?.[f.name] || '-'}
+                                             {idx === 0 && s.user_is_active === false && (
+                                                <span className="badge badge-warning" style={{ marginLeft: '0.8rem', fontSize: '0.65rem', background: '#EF4444', color: 'white' }}>PORTAL REVOKED</span>
+                                             )}
+                                          </td>
                                        ))}
                                        <td style={{ padding: '1rem' }} data-label="Portal Login">
                                           <div style={{ fontSize: '0.75rem', opacity: 0.6 }}>User: <strong>{s.user_username || 'N/A'}</strong></div>
                                           <div style={{ fontSize: '0.75rem', opacity: 0.4 }}>Default: Pass@{s.registration_number}</div>
                                        </td>
                                        <td style={{ padding: '1rem', textAlign: 'right', borderRadius: '0 12px 12px 0' }} data-label="Actions">
-                                          <button className="btn-secondary" style={{ padding: '0.4rem 0.6rem' }} onClick={() => { setEditingStudent(s); setStudentForm({ custom_data: s.custom_data }); setShowAddStudent(true); }}>Edit</button>
-                                          <button onClick={async () => {
-                                             if (!window.confirm("Permanently archive student record?")) return;
-                                             await fetch(`${API_BASE_URL}/api/students/${s.id}/`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
-                                             fetchItems();
-                                          }} style={{ marginLeft: '0.5rem', background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: 'none', padding: '0.4rem 0.6rem', borderRadius: '4px', cursor: 'pointer' }}>Archive</button>
+                                          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
+                                             <button className="btn-secondary" style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }} onClick={() => { setEditingStudent(s); setStudentForm({ custom_data: s.custom_data }); setShowAddStudent(true); }}>Edit</button>
+                                             
+                                             {s.user_is_active !== false ? (
+                                                <button 
+                                                   onClick={async () => {
+                                                      if (!window.confirm("Revoke this student's login access?")) return;
+                                                      await fetch(`${API_BASE_URL}/api/students/${s.id}/revoke/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+                                                      fetchItems();
+                                                   }} 
+                                                   style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: '1px solid #EF4444', padding: '0.4rem 0.6rem', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem' }}
+                                                >
+                                                   Revoke Access
+                                                </button>
+                                             ) : (
+                                                <button 
+                                                   onClick={async () => {
+                                                      await fetch(`${API_BASE_URL}/api/students/${s.id}/activate/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+                                                      fetchItems();
+                                                   }} 
+                                                   style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid #10B981', padding: '0.4rem 0.6rem', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem' }}
+                                                >
+                                                   Restore Access
+                                                </button>
+                                             )}
+
+                                             <button 
+                                                onClick={async () => {
+                                                   if (!window.confirm("PERMANENTLY DELETE student record and user account? This cannot be undone.")) return;
+                                                   await fetch(`${API_BASE_URL}/api/students/${s.id}/`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                                                   fetchItems();
+                                                }} 
+                                                style={{ background: '#EF4444', color: 'white', border: 'none', padding: '0.4rem 0.6rem', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem' }}
+                                                title="Delete Permanently"
+                                             >
+                                                <i className="fas fa-trash-alt"></i>
+                                             </button>
+                                          </div>
                                        </td>
                                     </tr>
                                  ))}
@@ -1457,26 +1581,63 @@ function ManagerDashboard({ token, logout }) {
                            {instructors.filter(inst =>
                               Object.values(inst.custom_data || {}).some(v => v.toString().toLowerCase().includes(instructorSearch.toLowerCase()))
                            ).map(inst => (
-                              <tr key={inst.id} style={{ background: 'rgba(255,255,255,0.02)' }}>
+                              <tr key={inst.id} style={{ background: inst.user_is_active === false ? 'rgba(239, 68, 68, 0.05)' : 'rgba(255,255,255,0.02)', borderLeft: inst.user_is_active === false ? '4px solid #EF4444' : 'none' }}>
                                  {org.instructor_fields_config?.slice(0, 3).map((f, idx) => (
-                                    <td key={f.id} data-label={f.name} style={{ padding: '1rem' }}>{inst.custom_data?.[f.name] || '-'}</td>
+                                    <td key={f.id} data-label={f.name} style={{ padding: '1rem' }}>
+                                       {inst.custom_data?.[f.name] || '-'}
+                                       {idx === 0 && inst.user_is_active === false && (
+                                          <span className="badge badge-warning" style={{ marginLeft: '0.8rem', fontSize: '0.65rem', background: '#EF4444', color: 'white' }}>REVOKED</span>
+                                       )}
+                                    </td>
                                  ))}
                                  <td style={{ padding: '1rem' }} data-label="Staff Login">
                                     <div style={{ fontSize: '0.75rem', opacity: 0.6 }}>User: <strong>{inst.user_username || 'N/A'}</strong></div>
                                     <div style={{ fontSize: '0.75rem', opacity: 0.4 }}>Default: Pass@{inst.registration_number}</div>
                                  </td>
                                  <td style={{ padding: '1rem', textAlign: 'right' }} data-label="Actions">
-                                    <button className="btn-secondary" style={{ padding: '0.4rem 0.6rem' }} onClick={() => {
-                                       setEditingInstructor(inst);
-                                       const taught = subjects.filter(s => s.instructors?.includes(inst.id)).map(s => s.id);
-                                       setInstructorForm({ subjects: taught, classrooms: inst.classrooms || [], custom_data: inst.custom_data || {} });
-                                       setShowAddInstructor(true);
-                                    }}>Edit</button>
-                                    <button onClick={async () => {
-                                       if (!window.confirm("Revoke instructor access? This removes them from all subjects.")) return;
-                                       await fetch(`${API_BASE_URL}/api/instructors/${inst.id}/`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
-                                       fetchItems();
-                                    }} style={{ marginLeft: '0.5rem', background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: 'none', padding: '0.4rem 0.6rem', borderRadius: '4px', cursor: 'pointer' }}>Revoke</button>
+                                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
+                                       <button className="btn-secondary" style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }} onClick={() => {
+                                          setEditingInstructor(inst);
+                                          const taught = subjects.filter(s => s.instructors?.includes(inst.id)).map(s => s.id);
+                                          setInstructorForm({ subjects: taught, classrooms: inst.classrooms || [], custom_data: inst.custom_data || {} });
+                                          setShowAddInstructor(true);
+                                       }}>Edit</button>
+
+                                       {inst.user_is_active !== false ? (
+                                          <button 
+                                             onClick={async () => {
+                                                if (!window.confirm("Revoke all portal access for this instructor?")) return;
+                                                await fetch(`${API_BASE_URL}/api/instructors/${inst.id}/revoke/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+                                                fetchItems();
+                                             }} 
+                                             style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: '1px solid #EF4444', padding: '0.4rem 0.6rem', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem' }}
+                                          >
+                                             Revoke
+                                          </button>
+                                       ) : (
+                                          <button 
+                                             onClick={async () => {
+                                                await fetch(`${API_BASE_URL}/api/instructors/${inst.id}/activate/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+                                                fetchItems();
+                                             }} 
+                                             style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid #10B981', padding: '0.4rem 0.6rem', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem' }}
+                                          >
+                                             Restore
+                                          </button>
+                                       )}
+
+                                       <button 
+                                          onClick={async () => {
+                                             if (!window.confirm("PERMANENTLY DELETE instructor?")) return;
+                                             await fetch(`${API_BASE_URL}/api/instructors/${inst.id}/`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                                             fetchItems();
+                                          }} 
+                                          style={{ background: '#EF4444', color: 'white', border: 'none', padding: '0.4rem 0.6rem', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem' }}
+                                          title="Delete"
+                                       >
+                                          <i className="fas fa-trash-alt"></i>
+                                       </button>
+                                    </div>
                                  </td>
                               </tr>
                            ))}
@@ -1518,14 +1679,14 @@ function ManagerDashboard({ token, logout }) {
                      </div>
 
                      {/* Settings Column */}
-                     <div className="dashboard-card" style={{ flex: 1.5, border: '1px solid var(--primary-color)' }}>
+                     <div className="dashboard-card" style={{ flex: 1.5, border: '1px solid var(--primary-color)', overflowX: 'hidden' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '1rem' }}>
                            <div className="badge badge-success" style={{ padding: '0.5rem' }}><i className="fas fa-clock"></i></div>
                            <h3>School Operations & Intervals</h3>
                         </div>
                         <p style={{ fontSize: '0.85rem', opacity: 0.6, marginBottom: '2rem' }}>Configure global hours and define specific intervals/breaks.</p>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '2rem' }} className="stat-grid">
+                        <div className="grid-mobile-stack" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
                            <div className="form-group">
                               <label>School Starts At</label>
                               <input type="time" value={org.school_start_time || ''} onChange={async (e) => {
@@ -1565,7 +1726,7 @@ function ManagerDashboard({ token, logout }) {
 
                         <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem' }}>
                            <h4 style={{ marginBottom: '1rem' }}>Custom Breaks & Intervals</h4>
-                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '0.8rem', background: 'rgba(15,23,42,0.6)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.5rem' }}>
+                           <div className="grid-mobile-stack" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.8rem', background: 'rgba(15,23,42,0.6)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.5rem', alignItems: 'end' }}>
                               <input placeholder="Break Name" value={newInterval.name} onChange={e => setNewInterval({ ...newInterval, name: e.target.value })} />
                               <input type="time" value={newInterval.start} onChange={e => setNewInterval({ ...newInterval, start: e.target.value })} />
                               <input type="time" value={newInterval.end} onChange={e => setNewInterval({ ...newInterval, end: e.target.value })} />
@@ -1846,6 +2007,102 @@ function DailyMonitoringView({ token }) {
          </div>
       );
    }
+   function TimetableView({ token, type, id, dayFilter = null }) {
+      const [slots, setSlots] = useState([]);
+      const [timetables, setTimetables] = useState([]);
+      const [subjects, setSubjects] = useState([]);
+      const [org, setOrg] = useState(null);
+      const [selectedDay, setSelectedDay] = useState(new Date().getDay() === 0 ? 0 : new Date().getDay() - 1);
+
+      useEffect(() => {
+         const headers = { 'Authorization': `Bearer ${token}` };
+         fetch(`${API_BASE_URL}/api/organizations/`, { headers }).then(res => res.json()).then(data => data && setOrg(data[0]));
+         fetch(`${API_BASE_URL}/api/subjects/`, { headers }).then(res => res.json()).then(setSubjects);
+         
+         let url = `${API_BASE_URL}/api/timetables/`;
+         if (type === 'CLASSROOM') url += `?classroom=${id}`;
+         else if (type === 'INSTRUCTOR') url += `?instructor=${id}`;
+         fetch(url, { headers }).then(res => res.json()).then(setTimetables);
+      }, [token, type, id]);
+
+      const generateSlots = () => {
+         if (!org) return [];
+         const [sh, sm] = (org.school_start_time || '08:30:00').split(':').map(Number);
+         const [eh, em] = (org.school_end_time || '15:30:00').split(':').map(Number);
+         const periodDuration = parseInt(org.period_duration_minutes) || 45;
+         const custom = (org.custom_intervals || []).map(ci => ({
+            ...ci,
+            startMins: parseInt(ci.start.split(':')[0]) * 60 + parseInt(ci.start.split(':')[1]),
+            endMins: parseInt(ci.end.split(':')[0]) * 60 + parseInt(ci.end.split(':')[1]),
+         }));
+
+         let current = sh * 60 + sm;
+         const end = eh * 60 + em;
+         const res = [];
+         let pNum = 1;
+         let guard = 0;
+         while (current < end && guard < 100) {
+            guard++;
+            const activeCI = custom.find(ci => ci.startMins <= current && ci.endMins > current);
+            if (activeCI) {
+               res.push({ type: 'BREAK', label: activeCI.name.toUpperCase(), start: activeCI.start + ':00', end: activeCI.end + ':00' });
+               current = activeCI.endMins;
+            } else {
+               const nextCI = custom.find(ci => ci.startMins > current && ci.startMins < current + periodDuration);
+               if (nextCI) { current = nextCI.startMins; continue; }
+               if (current + periodDuration > end) break;
+               const sStr = `${String(Math.floor(current / 60)).padStart(2, '0')}:${String(current % 60).padStart(2, '0')}:00`;
+               const eStr = `${String(Math.floor((current + periodDuration) / 60)).padStart(2, '0')}:${String((current + periodDuration) % 60).padStart(2, '0')}:00`;
+               res.push({ type: 'PERIOD', label: `P${pNum++}`, start: sStr, end: eStr });
+               current += periodDuration;
+            }
+         }
+         return res;
+      };
+
+      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+      const currentSlots = generateSlots();
+
+      return (
+         <div className="animate-fadeIn">
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+               {days.map((d, i) => (
+                  <button key={d} onClick={() => setSelectedDay(i)} className={selectedDay === i ? 'badge badge-success' : 'badge'} style={{ minWidth: '80px', fontSize: '0.8rem', padding: '0.4rem', border: '1px solid rgba(255,255,255,0.1)', background: selectedDay === i ? 'var(--primary-color)' : 'transparent', color: 'white', cursor: 'pointer' }}>{d}</button>
+               ))}
+            </div>
+            <div className="dashboard-card" style={{ padding: '0', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)' }}>
+               <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {currentSlots.map((slot, idx) => {
+                     const isBreak = slot.type === 'BREAK';
+                     const entries = timetables.filter(t => t.day_of_week === selectedDay && t.start_time === slot.start);
+                     return (
+                        <div key={idx} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', borderBottom: '1px solid rgba(255,255,255,0.05)', minHeight: isBreak ? '50px' : '100px' }}>
+                           <div style={{ padding: '1rem', background: isBreak ? 'rgba(192,132,252,0.05)' : 'transparent', borderRight: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                              <div style={{ fontWeight: 'bold', color: isBreak ? 'var(--primary-color)' : 'white' }}>{slot.label}</div>
+                              <div style={{ fontSize: '0.7rem', opacity: 0.4 }}>{slot.start.slice(0, 5)} - {slot.end.slice(0, 5)}</div>
+                           </div>
+                           <div style={{ padding: '1rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                              {isBreak ? (
+                                 <span style={{ fontSize: '0.8rem', opacity: 0.2, letterSpacing: '2px' }}>REST INTERVAL</span>
+                              ) : (
+                                 entries.map(t => (
+                                    <div key={t.id} style={{ padding: '0.8rem 1.2rem', background: 'linear-gradient(135deg, rgba(59,130,246,0.1), rgba(192,132,252,0.1))', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '10px', minWidth: '150px' }}>
+                                       <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{t.subject_name}</div>
+                                       <div style={{ fontSize: '0.75rem', opacity: 0.6 }}>{t.instructor_name} {type === 'INSTRUCTOR' && `• ${subjects.find(s => s.id === t.subject)?.classroom_name || 'Class'}`}</div>
+                                    </div>
+                                 ))
+                              )}
+                              {!isBreak && entries.length === 0 && <span style={{ opacity: 0.1 }}>No sessions scheduled</span>}
+                           </div>
+                        </div>
+                     );
+                  })}
+               </div>
+            </div>
+         </div>
+      );
+   }
+
 
    function DailyTaskCalendar({ token, classroomId, date, role }) {
       const [tasks, setTasks] = useState([]);
@@ -2018,6 +2275,7 @@ function DailyMonitoringView({ token }) {
       const [classrooms, setClassrooms] = useState([]);
       const [selectedClassId, setSelectedClassId] = useState('');
       const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+      const [instructorView, setInstructorView] = useState('tasks');
 
       useEffect(() => {
          fetch(`${API_BASE_URL}/api/classrooms/`, { headers: { 'Authorization': `Bearer ${token}` } })
@@ -2029,47 +2287,51 @@ function DailyMonitoringView({ token }) {
             <h2 style={{ fontSize: '2.25rem' }}>Instructor <span className="nav-brand" style={{ fontSize: '2.25rem' }}>Portal</span></h2>
             <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Access your classrooms, manage students, and schedule daily tasks.</p>
 
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }} className="grid-mobile-stack">
-               <div className="form-group" style={{ flex: 1 }}>
-                  <label>Current Classroom</label>
-                  <select value={selectedClassId} onChange={e => setSelectedClassId(e.target.value)}>
-                     <option value="">Select Classroom...</option>
-                     {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-               </div>
-               <div className="form-group">
-                  <label>Working Date</label>
-                  <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} />
-               </div>
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1rem' }}>
+               <button onClick={() => setInstructorView('tasks')} className={instructorView === 'tasks' ? 'btn-primary' : 'btn-logout'} style={{ padding: '0.5rem 1.5rem' }}>Daily Progress</button>
+               <button onClick={() => setInstructorView('timetable')} className={instructorView === 'timetable' ? 'btn-primary' : 'btn-logout'} style={{ padding: '0.5rem 1.5rem' }}>Personal Schedule</button>
             </div>
 
-            {selectedClassId ? (
-               <DailyTaskCalendar token={token} classroomId={selectedClassId} date={selectedDate} role="INSTRUCTOR" />
-            ) : (
-               <div className="animate-fadeIn">
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '2rem' }}>
-                     {classrooms.map(c => (
-                        <div key={c.id} className="dashboard-card" style={{ cursor: 'pointer', border: '1px solid var(--border-color)', transition: 'all 0.3s ease', padding: '1.25rem' }} onClick={() => setSelectedClassId(c.id)}>
-                           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                              <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(192,132,252,0.1)', color: '#C084FC', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', flexShrink: 0 }}>
-                                 <i className="fas fa-school"></i>
-                              </div>
-                              <div style={{ overflow: 'hidden' }}>
-                                 <h3 style={{ margin: 0, fontSize: '1.1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</h3>
-                                 <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.75rem', opacity: 0.6 }}>Tap to manage</p>
-                              </div>
-                           </div>
-                        </div>
-                     ))}
-                     {classrooms.length === 0 && (
-                        <div className="dashboard-card" style={{ gridColumn: '1/-1', textAlign: 'center', padding: '6rem', opacity: 0.5 }}>
-                           <i className="fas fa-chalkboard-teacher" style={{ fontSize: '4rem', marginBottom: '2rem' }}></i>
-                           <h3>No assigned classrooms found.</h3>
-                           <p>Please contact your manager to ensure you are linked to classrooms or subjects.</p>
-                        </div>
-                     )}
+            {instructorView === 'tasks' ? (
+               <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }} className="grid-mobile-stack">
+                  <div className="form-group" style={{ flex: 1 }}>
+                     <label>Current Classroom</label>
+                     <select value={selectedClassId} onChange={e => setSelectedClassId(e.target.value)}>
+                        <option value="">Select Classroom...</option>
+                        {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                     </select>
+                  </div>
+                  <div className="form-group">
+                     <label>Working Date</label>
+                     <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} />
                   </div>
                </div>
+            ) : null}
+
+            {instructorView === 'tasks' ? (
+               selectedClassId ? (
+                  <DailyTaskCalendar token={token} classroomId={selectedClassId} date={selectedDate} role="INSTRUCTOR" />
+               ) : (
+                  <div className="animate-fadeIn">
+                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '2rem' }}>
+                        {classrooms.map(c => (
+                           <div key={c.id} className="dashboard-card" style={{ cursor: 'pointer', border: '1px solid var(--border-color)', transition: 'all 0.3s ease', padding: '1.25rem' }} onClick={() => setSelectedClassId(c.id)}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                 <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(192,132,252,0.1)', color: '#C084FC', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', flexShrink: 0 }}>
+                                    <i className="fas fa-school"></i>
+                                 </div>
+                                 <div style={{ overflow: 'hidden' }}>
+                                    <h3 style={{ margin: 0, fontSize: '1.1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</h3>
+                                    <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.75rem', opacity: 0.6 }}>Tap to manage</p>
+                                 </div>
+                              </div>
+                           </div>
+                        ))}
+                     </div>
+                  </div>
+               )
+            ) : (
+               <TimetableView token={token} type="INSTRUCTOR" id="current" />
             )}
          </div>
       );
@@ -2078,6 +2340,7 @@ function DailyMonitoringView({ token }) {
    function StudentDashboard({ token, logout }) {
       const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
       const [studentProfile, setStudentProfile] = useState(null);
+      const [studentView, setStudentView] = useState('tasks');
 
       useEffect(() => {
          fetch(`${API_BASE_URL}/api/students/`, { headers: { 'Authorization': `Bearer ${token}` } })
@@ -2092,14 +2355,25 @@ function DailyMonitoringView({ token }) {
                   <h2 style={{ margin: 0 }}>Student <span className="nav-brand" style={{ fontSize: 'inherit' }}>Learning Hub</span></h2>
                   {studentProfile && <p style={{ opacity: 0.7, margin: '0.5rem 0 0 0' }}>Welcome, {studentProfile.first_name}! Access your daily schedule and materials for <strong>{studentProfile.classroom_name}</strong>.</p>}
                </div>
-               <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label>Filter Date</label>
-                  <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', width: '100%' }} />
+               <div style={{ display: 'flex', gap: '1rem' }} className="grid-mobile-stack">
+                  <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.2rem', borderRadius: '8px' }}>
+                     <button onClick={() => setStudentView('tasks')} className={studentView === 'tasks' ? 'btn-primary' : 'btn-logout'} style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }}>Daily Feed</button>
+                     <button onClick={() => setStudentView('timetable')} className={studentView === 'timetable' ? 'btn-primary' : 'btn-logout'} style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }}>Class Timetable</button>
+                  </div>
+                  {studentView === 'tasks' && (
+                     <div className="form-group" style={{ marginBottom: 0 }}>
+                        <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', padding: '0.4rem' }} />
+                     </div>
+                  )}
                </div>
             </div>
 
             {studentProfile?.classroom ? (
-               <DailyTaskCalendar token={token} classroomId={studentProfile.classroom} date={selectedDate} role="STUDENT" />
+               studentView === 'tasks' ? (
+                  <DailyTaskCalendar token={token} classroomId={studentProfile.classroom} date={selectedDate} role="STUDENT" />
+               ) : (
+                  <TimetableView token={token} type="CLASSROOM" id={studentProfile.classroom} />
+               )
             ) : (
                <div className="dashboard-card" style={{ textAlign: 'center', padding: '6rem', opacity: 0.5 }}>
                   <i className="fas fa-lock" style={{ fontSize: '4rem', marginBottom: '2rem' }}></i>
