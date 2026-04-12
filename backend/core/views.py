@@ -308,20 +308,30 @@ class TimetableViewSet(viewsets.ModelViewSet):
         qs = Timetable.objects.all()
         classroom = get_query_param(self.request, 'classroom')
         if classroom: qs = qs.filter(subject__classroom_id=classroom)
+        instructor = get_query_param(self.request, 'instructor')
+        if instructor: qs = qs.filter(instructor_id=instructor)
         org = get_query_param(self.request, 'organization')
         if org: qs = qs.filter(organization_id=org)
         return qs
     
     def perform_create(self, serializer):
         subject = serializer.validated_data['subject']
-        instructors = subject.instructors.all()
+        instructor = serializer.validated_data.get('instructor')
         day = serializer.validated_data['day_of_week']
         start = serializer.validated_data['start_time']
         
-        for instructor in instructors:
-            clashes = Timetable.objects.filter(subject__instructors=instructor, day_of_week=day, start_time=start)
+        # If a specific instructor is assigned, check only their clashes
+        if instructor:
+            clashes = Timetable.objects.filter(instructor=instructor, day_of_week=day, start_time=start)
             if clashes.exists():
                 raise serializers.ValidationError({"error": f"Clash! Instructor {instructor.registration_number} is already in {clashes[0].subject.classroom.name} for {clashes[0].subject.name}."})
+        else:
+            # Fallback for generic subject assignment (if any)
+            instructors = subject.instructors.all()
+            for inst in instructors:
+                clashes = Timetable.objects.filter(instructor=inst, day_of_week=day, start_time=start)
+                if clashes.exists():
+                    raise serializers.ValidationError({"error": f"Clash! Instructor {inst.registration_number} is already in {clashes[0].subject.classroom.name} for {clashes[0].subject.name}."})
         
         serializer.save()
 

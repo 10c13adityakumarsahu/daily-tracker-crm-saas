@@ -780,7 +780,7 @@ function ManagerDashboard({ token, logout }) {
    const daysLeft = getDaysLeft();
 
    return (
-      <div className="dashboard-container" style={{display: 'flex', minHeight: '100vh', position: 'relative', overflowX: 'hidden'}}>
+      <div className="dashboard-container" style={{display: 'flex', minHeight: '100vh', position: 'relative' }}>
       {/* Sidebar Overlay */}
       <div className={`sidebar-overlay ${showMobileMenu ? 'visible' : ''}`} onClick={() => setShowMobileMenu(false)} />
       
@@ -852,7 +852,7 @@ function ManagerDashboard({ token, logout }) {
             )}
          </div>
 
-         <div className="manager-main-content" style={{ flex: 1, padding: '2rem 3rem', overflowX: 'hidden', background: '#080c14', minHeight: '100vh' }}>
+         <div className="manager-main-content" style={{ flex: 1, padding: '2rem 3rem', background: '#080c14', minHeight: '100vh' }}>
             {activeTab === 'monitoring' && (
                <DailyMonitoringView token={token} />
             )}
@@ -984,57 +984,58 @@ function ManagerDashboard({ token, logout }) {
                         <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>Institutional control center for all academic assignments.</p>
                      </div>
 
-                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.8rem' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                           {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map((d, i) => (
-                              <button 
-                                 key={d} 
-                                 onClick={() => setSelectedScheduleDay(i)}
-                                 className="badge" 
-                                 style={{ 
-                                    background: selectedScheduleDay === i ? 'var(--primary-color)' : 'rgba(255,255,255,0.03)', 
-                                    border: '1px solid rgba(255,255,255,0.1)', 
-                                    cursor: 'pointer',
-                                    color: selectedScheduleDay === i ? 'white' : 'inherit'
-                                 }}
-                              >
-                                 {d}
-                              </button>
-                           ))}
-                        </div>
-                         <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.6rem 1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 800, opacity: 0.4 }}>FACULTY DEPLOYMENT BANK:</span>
-                             <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-                                {subjects.flatMap(s => (s.instructors || []).map(iid => ({ s, iid }))).map(({ s, iid }) => {
-                                   const teacher = instructors.find(i => i.id === iid);
-                                   const tName = teacher ? (Object.values(teacher.custom_data || {})[0] || teacher.registration_number) : '??';
-                                   return (
-                                      <div 
-                                         key={`${s.id}-${iid}`} 
-                                         draggable 
-                                         onDragStart={(e) => {
-                                            e.dataTransfer.setData('subjectId', s.id);
-                                            e.dataTransfer.setData('instructorId', iid);
-                                         }} 
-                                         style={{ padding: '0.4rem 0.8rem', background: 'var(--primary-color)', fontSize: '0.7rem', borderRadius: '6px', fontWeight: 'bold', cursor: 'grab', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}
-                                      >
-                                         {s.name} ({tName})
-                                      </div>
-                                   );
-                                }).slice(0, 8)}
-                                {subjects.flatMap(s => s.instructors).length > 8 && <span style={{ opacity: 0.3, fontSize: '0.7rem' }}>...</span>}
-                             </div>
-                         </div>
+                     <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map((d, i) => (
+                           <button 
+                              key={d} 
+                              onClick={() => setSelectedScheduleDay(i)}
+                              className="badge" 
+                              style={{ 
+                                 background: selectedScheduleDay === i ? 'var(--primary-color)' : 'rgba(255,255,255,0.03)', 
+                                 border: '1px solid rgba(255,255,255,0.1)', 
+                                 cursor: 'pointer',
+                                 color: selectedScheduleDay === i ? 'white' : 'inherit'
+                              }}
+                           >
+                              {d}
+                           </button>
+                        ))}
                      </div>
                   </div>
 
-                  <div className="dashboard-card" style={{ padding: '0', background: 'transparent', boxShadow: 'none' }}>
-                     <div style={{ overflowX: 'auto', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)' }}>
-                        <div style={{ minWidth: classrooms.length > 3 ? '1000px' : '100%', display: 'grid', gridTemplateColumns: `140px repeat(${classrooms.length}, 1fr)`, gap: '1px', background: 'rgba(255,255,255,0.05)' }}>
-                           <div style={{ padding: '1.5rem', background: 'var(--background-card)', fontWeight: 900, color: 'var(--primary-color)', fontSize: '0.8rem', letterSpacing: '1px' }}>TIME SLOTS</div>
+                  <div className="dashboard-card" style={{ padding: '0', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '24px', overflow: 'hidden', height: 'calc(100vh - 250px)', display: 'flex', flexDirection: 'column' }}>
+                     {/* Sticky Deployment Bank - Local to this container */}
+                     <div style={{ position: 'sticky', top: '0', zIndex: 100, background: 'var(--bg-secondary)', padding: '1rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
+                        <div style={{ display: 'flex', gap: '1.2rem', alignItems: 'center' }}>
+                           <span style={{ fontSize: '0.7rem', fontWeight: 900, opacity: 0.4, letterSpacing: '1px', whiteSpace: 'nowrap' }}>FACULTY BANK:</span>
+                           <div style={{ display: 'flex', gap: '0.6rem', overflowX: 'auto', paddingBottom: '0.2rem' }}>
+                              {subjects.flatMap(s => (s.instructors || []).map(iid => ({ s, iid }))).map(({ s, iid }) => {
+                                 const teacher = instructors.find(i => i.id === iid);
+                                 const tName = teacher ? (Object.values(teacher.custom_data || {})[0] || teacher.registration_number) : '??';
+                                 return (
+                                    <div 
+                                       key={`${s.id}-${iid}`} 
+                                       draggable 
+                                       onDragStart={(e) => {
+                                          e.dataTransfer.setData('subjectId', s.id);
+                                          e.dataTransfer.setData('instructorId', iid);
+                                       }} 
+                                       style={{ padding: '0.4rem 0.8rem', background: 'linear-gradient(135deg, var(--primary-color), #0D9488)', fontSize: '0.7rem', borderRadius: '8px', fontWeight: 'bold', cursor: 'grab', display: 'flex', alignItems: 'center', gap: '0.4rem', border: '1px solid rgba(255,255,255,0.1)', whiteSpace: 'nowrap' }}
+                                    >
+                                       <i className="fas fa-grip-lines-vertical" style={{ opacity: 0.4 }}></i>
+                                       {s.name} <span style={{ opacity: 0.6, fontWeight: 400 }}>| {tName}</span>
+                                    </div>
+                                 );
+                              })}
+                           </div>
+                        </div>
+                     </div>
+
+                     <div style={{ overflow: 'auto', flex: 1, width: '100%' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: `120px repeat(${classrooms.length}, minmax(180px, 1fr))`, gap: '1px', background: 'rgba(255,255,255,0.05)', width: 'max-content', minWidth: '100%' }}>
+                           <div style={{ padding: '1rem', background: 'var(--background-card)', fontWeight: 900, color: 'var(--primary-color)', fontSize: '0.7rem', letterSpacing: '1px', position: 'sticky', top: 0, left: 0, zIndex: 20 }}>TIME SLOTS</div>
                            {classrooms.map(c => (
-                              <div key={c.id} style={{ padding: '1.5rem', background: 'var(--background-card)', textAlign: 'center', fontWeight: 'bold', borderBottom: '2px solid rgba(192,132,252,0.3)', color: 'white', position: 'relative' }}>
-                                 <i className="fas fa-desktop" style={{ position: 'absolute', left: '1.5rem', opacity: 0.1, fontSize: '2rem' }}></i>
+                              <div key={c.id} style={{ padding: '1rem', background: 'var(--background-card)', textAlign: 'center', fontWeight: 'bold', borderBottom: '2px solid rgba(192,132,252,0.3)', color: 'white', position: 'sticky', top: 0, zIndex: 10 }}>
                                  {c.name}
                               </div>
                            ))}
@@ -1043,14 +1044,14 @@ function ManagerDashboard({ token, logout }) {
                               const isBreak = slot.type === 'BREAK';
                               return (
                                  <React.Fragment key={sIdx}>
-                                    <div style={{ padding: '1.5rem', background: isBreak ? 'linear-gradient(to right, rgba(192,132,252,0.05), transparent)' : 'var(--background-card)', borderRight: '1px solid rgba(255,255,255,0.03)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                                       <div style={{ fontSize: '1rem', fontWeight: 900, color: isBreak ? 'var(--primary-color)' : 'white' }}>{slot.label}</div>
-                                       <div style={{ fontSize: '0.75rem', opacity: 0.4 }}>{slot.start.slice(0, 5)} - {slot.end.slice(0, 5)}</div>
+                                    <div style={{ padding: '1rem', background: isBreak ? 'linear-gradient(to right, #1a1528, #080c14)' : 'var(--background-card)', borderRight: '1px solid rgba(255,255,255,0.03)', display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'sticky', left: 0, zIndex: 5 }}>
+                                       <div style={{ fontSize: '0.8rem', fontWeight: 900, color: isBreak ? 'var(--primary-color)' : 'white' }}>{slot.label}</div>
+                                       <div style={{ fontSize: '0.65rem', opacity: 0.4 }}>{slot.start.slice(0, 5)} - {slot.end.slice(0, 5)}</div>
                                     </div>
                                     {classrooms.map(c => {
                                        const entry = allTimetables.find(t => t.day_of_week === selectedScheduleDay && t.start_time === slot.start && subjects.find(sub => sub.id === t.subject)?.classroom === c.id);
                                        const subj = entry ? subjects.find(s => s.id === entry.subject) : null;
-                                       const teacher = subj ? instructors.find(i => i.id === subj.instructor) : null;
+                                       const teacherName = entry?.instructor_name || 'No Faculty';
 
                                        return (
                                           <div
@@ -1058,10 +1059,11 @@ function ManagerDashboard({ token, logout }) {
                                              onDragOver={e => e.preventDefault()}
                                              onDrop={async (e) => {
                                                 const sid = e.dataTransfer.getData('subjectId');
+                                                const iid = e.dataTransfer.getData('instructorId');
                                                 const res = await fetch(`${API_BASE_URL}/api/timetables/`, {
                                                    method: 'POST',
                                                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                                                   body: JSON.stringify({ organization: org.id, subject: sid, day_of_week: selectedScheduleDay, start_time: slot.start, end_time: slot.end })
+                                                   body: JSON.stringify({ organization: org.id, subject: sid, instructor: iid, day_of_week: selectedScheduleDay, start_time: slot.start, end_time: slot.end })
                                                 });
                                                 if (res.ok) fetchMasterData();
                                                 else { const err = await res.json(); alert(err.error || "Conflict detected."); }
@@ -1074,7 +1076,7 @@ function ManagerDashboard({ token, logout }) {
                                                 subj ? (
                                                    <div style={{ textAlign: 'center', width: '100%', padding: '1rem', background: 'linear-gradient(135deg, rgba(192,132,252,0.15), rgba(236,72,153,0.15))', border: '1px solid var(--primary-color)', borderRadius: '12px', boxShadow: '0 8px 24px rgba(192,132,252,0.2)', cursor: 'default' }}>
                                                       <div style={{ fontSize: '0.9rem', fontWeight: 900, color: 'white', marginBottom: '0.3rem' }}>{subj.name}</div>
-                                                      <div style={{ fontSize: '0.75rem', opacity: 0.7, fontStyle: 'italic' }}>{Object.values(teacher?.custom_data || {})[0] || teacher?.registration_number || 'Unnamed Staff'}</div>
+                                                      <div style={{ fontSize: '0.75rem', opacity: 0.7, fontStyle: 'italic' }}>{teacherName}</div>
                                                       <button
                                                          onClick={async () => {
                                                             if (!window.confirm("Remove session?")) return;
@@ -1214,35 +1216,13 @@ function ManagerDashboard({ token, logout }) {
                                  <h4 style={{ margin: 0 }}>Class Weekly Schedule (Read Only)</h4>
                                  <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>Instructors listed per slot</span>
                               </div>
-                              <div style={{ overflowX: 'auto', padding: '0.5rem' }}>
-                                 <div style={{ display: 'grid', gridTemplateColumns: '80px repeat(5, 1fr)', gap: '1px', background: 'rgba(255,255,255,0.05)' }}>
-                                    <div style={{ padding: '0.5rem', background: 'var(--background-card)' }}></div>
-                                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map(d => <div key={d} style={{ padding: '0.5rem', background: 'var(--background-card)', textAlign: 'center', fontWeight: 'bold', fontSize: '0.75rem' }}>{d}</div>)}
-                                    {[1, 2, 3, 4, 5].map(period => (
-                                       <React.Fragment key={period}>
-                                          <div style={{ padding: '0.5rem', background: 'var(--background-card)', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.5 }}>P{period}</div>
-                                          {[0, 1, 2, 3, 4].map(day => {
-                                             const entry = classDetails.timetable.find(t => t.day_of_week === day && t.start_time === `${period + 7}:00:00`);
-                                             const subject = entry ? classDetails.subjects.find(s => s.id === entry.subject) : null;
-                                             return (
-                                                <div key={`${day}-${period}`} style={{ padding: '0.5rem', minHeight: '60px', background: entry ? 'rgba(20,184,166,0.05)' : 'var(--background-card)', border: entry ? '1px solid rgba(20,184,166,0.2)' : 'none' }}>
-                                                   {subject && (
-                                                      <div style={{ fontSize: '0.7rem' }}>
-                                                         <div style={{ fontWeight: 'bold' }}>{subject.name}</div>
-                                                         <div style={{ fontSize: '0.6rem', opacity: 0.5, marginTop: '2px' }}>{subject.instructor_names}</div>
-                                                      </div>
-                                                   )}
-                                                </div>
-                                             );
-                                          })}
-                                       </React.Fragment>
-                                    ))}
-                                 </div>
+                              <div style={{ padding: '1.5rem', maxHeight: '450px', overflowY: 'auto', background: 'rgba(0,0,0,0.2)', borderRadius: '0 0 12px 12px' }}>
+                                 <TimetableView compact={true} key={allTimetables.length} token={token} type="CLASSROOM" id={selectedClassId} />
                               </div>
                            </motion.div>
                         )}
 
-                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 3fr', gap: '2rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 3fr', gap: '2rem', overflowX: 'auto', paddingBottom: '1rem' }}>
                            {/* Left Column: People & Metadata */}
                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                               <div className="dashboard-card">
@@ -2007,7 +1987,7 @@ function DailyMonitoringView({ token }) {
          </div>
       );
    }
-   function TimetableView({ token, type, id, dayFilter = null }) {
+   function TimetableView({ token, type, id, dayFilter = null, compact = false }) {
       const [slots, setSlots] = useState([]);
       const [timetables, setTimetables] = useState([]);
       const [subjects, setSubjects] = useState([]);
@@ -2065,9 +2045,9 @@ function DailyMonitoringView({ token }) {
 
       return (
          <div className="animate-fadeIn">
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: compact ? '0.8rem' : '1.5rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
                {days.map((d, i) => (
-                  <button key={d} onClick={() => setSelectedDay(i)} className={selectedDay === i ? 'badge badge-success' : 'badge'} style={{ minWidth: '80px', fontSize: '0.8rem', padding: '0.4rem', border: '1px solid rgba(255,255,255,0.1)', background: selectedDay === i ? 'var(--primary-color)' : 'transparent', color: 'white', cursor: 'pointer' }}>{d}</button>
+                  <button key={d} onClick={() => setSelectedDay(i)} className={selectedDay === i ? 'badge badge-success' : 'badge'} style={{ minWidth: compact ? '60px' : '80px', fontSize: compact ? '0.7rem' : '0.8rem', padding: '0.4rem', border: '1px solid rgba(255,255,255,0.1)', background: selectedDay === i ? 'var(--primary-color)' : 'transparent', color: 'white', cursor: 'pointer' }}>{d}</button>
                ))}
             </div>
             <div className="dashboard-card" style={{ padding: '0', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)' }}>
@@ -2076,23 +2056,23 @@ function DailyMonitoringView({ token }) {
                      const isBreak = slot.type === 'BREAK';
                      const entries = timetables.filter(t => t.day_of_week === selectedDay && t.start_time === slot.start);
                      return (
-                        <div key={idx} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', borderBottom: '1px solid rgba(255,255,255,0.05)', minHeight: isBreak ? '50px' : '100px' }}>
-                           <div style={{ padding: '1rem', background: isBreak ? 'rgba(192,132,252,0.05)' : 'transparent', borderRight: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                              <div style={{ fontWeight: 'bold', color: isBreak ? 'var(--primary-color)' : 'white' }}>{slot.label}</div>
-                              <div style={{ fontSize: '0.7rem', opacity: 0.4 }}>{slot.start.slice(0, 5)} - {slot.end.slice(0, 5)}</div>
+                        <div key={idx} style={{ display: 'grid', gridTemplateColumns: compact ? '80px 1fr' : '120px 1fr', borderBottom: '1px solid rgba(255,255,255,0.05)', minHeight: isBreak ? (compact ? '35px' : '50px') : (compact ? '60px' : '100px') }}>
+                           <div style={{ padding: compact ? '0.5rem' : '1rem', background: isBreak ? 'rgba(192,132,252,0.05)' : 'transparent', borderRight: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                              <div style={{ fontWeight: 'bold', fontSize: compact ? '0.75rem' : '1rem', color: isBreak ? 'var(--primary-color)' : 'white' }}>{slot.label}</div>
+                              <div style={{ fontSize: compact ? '0.6rem' : '0.7rem', opacity: 0.4 }}>{slot.start.slice(0, 5)} - {slot.end.slice(0, 5)}</div>
                            </div>
-                           <div style={{ padding: '1rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                           <div style={{ padding: compact ? '0.5rem' : '1rem', display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
                               {isBreak ? (
-                                 <span style={{ fontSize: '0.8rem', opacity: 0.2, letterSpacing: '2px' }}>REST INTERVAL</span>
+                                 <span style={{ fontSize: compact ? '0.65rem' : '0.8rem', opacity: 0.2, letterSpacing: '2px' }}>REST INTERVAL</span>
                               ) : (
                                  entries.map(t => (
-                                    <div key={t.id} style={{ padding: '0.8rem 1.2rem', background: 'linear-gradient(135deg, rgba(59,130,246,0.1), rgba(192,132,252,0.1))', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '10px', minWidth: '150px' }}>
-                                       <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{t.subject_name}</div>
-                                       <div style={{ fontSize: '0.75rem', opacity: 0.6 }}>{t.instructor_name} {type === 'INSTRUCTOR' && `• ${subjects.find(s => s.id === t.subject)?.classroom_name || 'Class'}`}</div>
+                                    <div key={t.id} style={{ padding: compact ? '0.4rem 0.8rem' : '0.8rem 1.2rem', background: 'linear-gradient(135deg, rgba(59,130,246,0.1), rgba(192,132,252,0.1))', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '8px', minWidth: compact ? '120px' : '150px' }}>
+                                       <div style={{ fontWeight: 'bold', fontSize: compact ? '0.75rem' : '0.9rem' }}>{t.subject_name}</div>
+                                       <div style={{ fontSize: compact ? '0.65rem' : '0.75rem', opacity: 0.6 }}>{t.instructor_name} {type === 'INSTRUCTOR' && `• ${subjects.find(s => s.id === t.subject)?.classroom_name || 'Class'}`}</div>
                                     </div>
                                  ))
                               )}
-                              {!isBreak && entries.length === 0 && <span style={{ opacity: 0.1 }}>No sessions scheduled</span>}
+                              {!isBreak && entries.length === 0 && <span style={{ opacity: 0.1, fontSize: '0.65rem' }}>Empty Slot</span>}
                            </div>
                         </div>
                      );
@@ -2273,6 +2253,7 @@ function DailyMonitoringView({ token }) {
 
    function InstructorDashboard({ token, logout }) {
       const [classrooms, setClassrooms] = useState([]);
+      const [instructorProfile, setInstructorProfile] = useState(null);
       const [selectedClassId, setSelectedClassId] = useState('');
       const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
       const [instructorView, setInstructorView] = useState('tasks');
@@ -2280,6 +2261,11 @@ function DailyMonitoringView({ token }) {
       useEffect(() => {
          fetch(`${API_BASE_URL}/api/classrooms/`, { headers: { 'Authorization': `Bearer ${token}` } })
             .then(res => res.json()).then(setClassrooms);
+         
+         // Fetch instructor profile to get instructor_id
+         fetch(`${API_BASE_URL}/api/instructors/`, { headers: { 'Authorization': `Bearer ${token}` } })
+            .then(res => res.json())
+            .then(data => data && data[0] && setInstructorProfile(data[0]));
       }, [token]);
 
       return (
@@ -2318,12 +2304,13 @@ function DailyMonitoringView({ token }) {
                            <div key={c.id} className="dashboard-card" style={{ cursor: 'pointer', border: '1px solid var(--border-color)', transition: 'all 0.3s ease', padding: '1.25rem' }} onClick={() => setSelectedClassId(c.id)}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(192,132,252,0.1)', color: '#C084FC', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', flexShrink: 0 }}>
-                                    <i className="fas fa-school"></i>
+                                    <i className="fas fa-chalkboard"></i>
                                  </div>
-                                 <div style={{ overflow: 'hidden' }}>
-                                    <h3 style={{ margin: 0, fontSize: '1.1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</h3>
-                                    <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.75rem', opacity: 0.6 }}>Tap to manage</p>
+                                 <div style={{ flex: 1 }}>
+                                    <h4 style={{ margin: 0 }}>{c.name}</h4>
+                                    <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.8rem', opacity: 0.5 }}>Monitoring Hub</p>
                                  </div>
+                                 <i className="fas fa-chevron-right" style={{ opacity: 0.2 }}></i>
                               </div>
                            </div>
                         ))}
@@ -2331,7 +2318,11 @@ function DailyMonitoringView({ token }) {
                   </div>
                )
             ) : (
-               <TimetableView token={token} type="INSTRUCTOR" id="current" />
+               instructorProfile ? (
+                  <TimetableView token={token} type="INSTRUCTOR" id={instructorProfile.id} />
+               ) : (
+                  <div style={{ textAlign: 'center', padding: '5rem', opacity: 0.5 }}>Loading personal schedule...</div>
+               )
             )}
          </div>
       );
