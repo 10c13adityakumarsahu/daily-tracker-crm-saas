@@ -6,7 +6,7 @@ from .serializers import *
 import requests
 import threading
 import os
-import google.generativeai as genai
+from google import genai
 
 def sanitize_input(text):
     if not text: return ""
@@ -24,48 +24,49 @@ def sanitize_input(text):
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
-def parent_ask_ai(request):
+def user_ask_ai(request):
     user = request.user
-    if user.role != 'PARENT':
-        return Response({'error': 'Only parents can access this feature'}, status=403)
+    if user.role not in ['PARENT', 'STUDENT']:
+        return Response({'error': 'Role not authorized for AI Assistant'}, status=403)
     
-    parent = getattr(user, 'parent_profile', None)
-    if not parent:
-        return Response({'error': 'Parent profile not found'}, status=404)
-    
-    raw_query = request.data.get('query')
-    query = sanitize_input(raw_query)
-    
+    query = sanitize_input(request.data.get('query'))
     if query is None:
         return Response({'error': 'Security Protocol Violation: Restricted keywords detected.'}, status=400)
-    
     if not query:
         return Response({'error': 'A valid query is required'}, status=400)
-    
+
     # 1. Gather context
-    children = parent.children.all()
     context_parts = []
     
-    for child in children:
-        child_context = f"Student: {child.first_name} {child.last_name} (Class: {child.classroom.name if child.classroom else 'N/A'})\n"
-        if child.classroom:
-            homeworks = Homework.objects.filter(session__timetable__subject__classroom=child.classroom).order_by('-deadline')[:5]
-            child_context += "Recent Homework:\n"
+    if user.role == 'PARENT':
+        parent = getattr(user, 'parent_profile', None)
+        if not parent: return Response({'error': 'Parent profile not found'}, status=404)
+        targets = parent.children.all()
+    else:
+        student = getattr(user, 'student_profile', None)
+        if not student: return Response({'error': 'Student profile not found'}, status=404)
+        targets = [student]
+
+    for target in targets:
+        target_context = f"Student: {target.first_name} {target.last_name} (Class: {target.classroom.name if target.classroom else 'N/A'})\n"
+        if target.classroom:
+            homeworks = Homework.objects.filter(session__timetable__subject__classroom=target.classroom).order_by('-deadline')[:5]
+            target_context += "Recent Homework:\n"
             for hw in homeworks:
-                child_context += f"- {hw.title}: {hw.description} (Deadline: {hw.deadline})\n"
+                target_context += f"- {hw.title}: {hw.description} (Deadline: {hw.deadline})\n"
             
-            tasks = DailyTask.objects.filter(classroom=child.classroom).order_by('-date')[:5]
-            child_context += "Recent Lessons/Tasks:\n"
+            tasks = DailyTask.objects.filter(classroom=target.classroom).order_by('-date')[:5]
+            target_context += "Recent Lessons/Tasks:\n"
             for t in tasks:
-                child_context += f"- {t.date} [{t.get_category_display()}]: {t.topic} - {t.description}\n"
+                target_context += f"- {t.date} [{t.get_category_display()}]: {t.topic} - {t.description}\n"
         
-        context_parts.append(child_context)
+        context_parts.append(target_context)
     
     full_context = "\n".join(context_parts)
     
     # 2. Call Gemini
     api_key = os.getenv('GEMINI_API_KEY')
-    model_name = os.getenv('GEMINI_MODEL', 'gemini-1.5-flash')
+    model_name = os.getenv('GEMINI_MODEL', 'gemini-flash-latest').strip()
     
     if not api_key or api_key == 'your_gemini_api_key_here':
          return Response({'answer': "Gemini API key is not configured. Please add it to the .env file."})
@@ -76,16 +77,18 @@ def parent_ask_ai(request):
         with open(prompt_path, 'r') as f:
             prompt_template = f.read()
         
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(model_name)
-        
+        client = genai.Client(api_key=api_key)
         final_prompt = prompt_template.format(context=full_context, query=query)
         
-        response = model.generate_content(final_prompt)
-        # Ensure plain text (strip markdown if necessary, although Gemini usually obeys)
+        response = client.models.generate_content(
+            model=model_name,
+            contents=final_prompt
+        )
+        # Ensure plain text (strip markdown if necessary)
         clean_response = response.text.replace('**', '').replace('__', '').replace('`', '')
         return Response({'answer': clean_response.strip()})
     except Exception as e:
+        print(f"AI Assistant Error: {str(e)}")
         return Response({'error': 'The AI assistant is currently unavailable.'}, status=500)
 
 def trigger_webhook(instance, action='created'):

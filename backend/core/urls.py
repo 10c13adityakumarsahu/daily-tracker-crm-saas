@@ -24,6 +24,6 @@ urlpatterns = [
     path('api/signup/organizer/', organizer_signup, name='organizer_signup'),
     path('api/token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('api/parent/ask/', parent_ask_ai, name='parent_ask_ai'),
+    path('api/ask_ai/', user_ask_ai, name='user_ask_ai'),
     path('api/', include(router.urls)),
 ]

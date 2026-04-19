@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Routes, Route, Link, useNavigate } from 'react-router-dom';
 import LandingPage from './LandingPage';
@@ -2360,11 +2360,18 @@ function DailyMonitoringView({ token }) {
             </div>
 
             {studentProfile?.classroom ? (
-               studentView === 'tasks' ? (
-                  <DailyTaskCalendar token={token} classroomId={studentProfile.classroom} date={selectedDate} role="STUDENT" />
-               ) : (
-                  <TimetableView token={token} type="CLASSROOM" id={studentProfile.classroom} />
-               )
+               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2.5rem' }} className="grid-mobile-stack">
+                  <div>
+                     {studentView === 'tasks' ? (
+                        <DailyTaskCalendar token={token} classroomId={studentProfile.classroom} date={selectedDate} role="STUDENT" />
+                     ) : (
+                        <TimetableView token={token} type="CLASSROOM" id={studentProfile.classroom} />
+                     )}
+                  </div>
+                  <div>
+                     <SmartAssistant token={token} />
+                  </div>
+               </div>
             ) : (
                <div className="dashboard-card" style={{ textAlign: 'center', padding: '6rem', opacity: 0.5 }}>
                   <i className="fas fa-lock" style={{ fontSize: '4rem', marginBottom: '2rem' }}></i>
@@ -2376,17 +2383,18 @@ function DailyMonitoringView({ token }) {
       );
    }
 
-   function ParentDashboard({ token }) {
+   function SmartAssistant({ token }) {
       const [query, setQuery] = useState('');
       const [history, setHistory] = useState([]);
       const [loading, setLoading] = useState(false);
-      const [children, setChildren] = useState([]);
+
+      const historyRef = useRef(null);
 
       useEffect(() => {
-         fetch(`${API_BASE_URL}/api/students/`, { headers: { 'Authorization': `Bearer ${token}` } })
-            .then(res => res.json())
-            .then(setChildren);
-      }, [token]);
+         if (historyRef.current) {
+            historyRef.current.scrollTop = historyRef.current.scrollHeight;
+         }
+      }, [history]);
 
       const askAI = async (e) => {
          e.preventDefault();
@@ -2399,7 +2407,7 @@ function DailyMonitoringView({ token }) {
          setQuery('');
 
          try {
-            const res = await fetch(`${API_BASE_URL}/api/parent/ask/`, {
+            const res = await fetch(`${API_BASE_URL}/api/ask_ai/`, {
                method: 'POST',
                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                body: JSON.stringify({ query: userMsg.text })
@@ -2410,6 +2418,61 @@ function DailyMonitoringView({ token }) {
             setHistory(prev => [...prev, { role: 'ai', text: 'Sorry, I encountered an error connecting to the AI service.' }]);
          } finally { setLoading(false); }
       };
+
+      return (
+         <div className="dashboard-card" style={{ display: 'flex', flexDirection: 'column', height: '600px', padding: 0, overflow: 'hidden', border: '1px solid var(--primary-color)', background: 'rgba(15,23,42,0.6)' }}>
+            <div style={{ padding: '1.2rem', background: 'linear-gradient(to right, rgba(192,132,252,0.1), transparent)', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+               <div style={{ width: '35px', height: '35px', borderRadius: '50%', background: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                  <i className="fas fa-robot"></i>
+               </div>
+               <div>
+                  <h4 style={{ margin: 0, fontSize: '0.95rem' }}>DailyTracker Smart Assistant</h4>
+                  <p style={{ margin: 0, fontSize: '0.7rem', opacity: 0.6 }}>Instant answers to school queries</p>
+               </div>
+            </div>
+
+            <div ref={historyRef} style={{ flex: 1, overflowY: 'auto', padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.8rem', scrollBehavior: 'smooth' }}>
+               {history.length === 0 && (
+                  <div style={{ textAlign: 'center', marginTop: '3rem', opacity: 0.3 }}>
+                     <i className="fas fa-microchip" style={{ fontSize: '2.5rem', marginBottom: '0.8rem' }}></i>
+                     <p style={{ fontSize: '0.85rem' }}>Ask me about homework, lessons, or deadlines.</p>
+                  </div>
+               )}
+               {history.map((msg, i) => (
+                  <div key={i} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '90%' }}>
+                     <div style={{ 
+                        padding: '0.6rem 1rem', 
+                        borderRadius: msg.role === 'user' ? '15px 15px 2px 15px' : '15px 15px 15px 2px',
+                        background: msg.role === 'user' ? 'var(--primary-color)' : 'rgba(255,255,255,0.08)',
+                        color: 'white',
+                        fontSize: '0.85rem',
+                        lineHeight: '1.4'
+                     }}>
+                        {msg.text}
+                     </div>
+                  </div>
+               ))}
+               {loading && <div style={{ alignSelf: 'flex-start', padding: '0.4rem 0.8rem', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', fontSize: '0.75rem', opacity: 0.5 }}>Analyzing records...</div>}
+            </div>
+
+            <form onSubmit={askAI} style={{ padding: '1.2rem', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', gap: '0.6rem' }}>
+               <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Type your message..." style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '0.6rem 1rem', color: 'white', fontSize: '0.85rem' }} disabled={loading} />
+               <button type="submit" disabled={loading} className="btn-primary" style={{ width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <i className="fas fa-paper-plane" style={{ fontSize: '0.9rem' }}></i>
+               </button>
+            </form>
+         </div>
+      );
+   }
+
+   function ParentDashboard({ token }) {
+      const [children, setChildren] = useState([]);
+
+      useEffect(() => {
+         fetch(`${API_BASE_URL}/api/students/`, { headers: { 'Authorization': `Bearer ${token}` } })
+            .then(res => res.json())
+            .then(setChildren);
+      }, [token]);
 
       return (
          <div className="dashboard animate-fadeIn">
@@ -2449,45 +2512,8 @@ function DailyMonitoringView({ token }) {
                   </div>
                </div>
 
-               <div className="dashboard-card" style={{ display: 'flex', flexDirection: 'column', height: '600px', padding: 0, overflow: 'hidden', border: '1px solid var(--primary-color)', background: 'rgba(15,23,42,0.6)' }}>
-                  <div style={{ padding: '1.5rem', background: 'linear-gradient(to right, rgba(192,132,252,0.1), transparent)', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                     <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
-                        <i className="fas fa-robot"></i>
-                     </div>
-                     <div>
-                        <h4 style={{ margin: 0 }}>Smart School Assistant</h4>
-                        <p style={{ margin: 0, fontSize: '0.75rem', opacity: 0.6 }}>Ask about homework or lessons</p>
-                     </div>
-                  </div>
-
-                  <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                     {history.length === 0 && (
-                        <div style={{ textAlign: 'center', marginTop: '4rem', opacity: 0.4 }}>
-                           <p>Ask me anything about your child's school day.</p>
-                        </div>
-                     )}
-                     {history.map((msg, i) => (
-                        <div key={i} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%' }}>
-                           <div style={{ 
-                              padding: '0.8rem 1.2rem', 
-                              borderRadius: msg.role === 'user' ? '18px 18px 2px 18px' : '18px 18px 18px 2px',
-                              background: msg.role === 'user' ? 'var(--primary-color)' : 'rgba(255,255,255,0.08)',
-                              color: 'white',
-                              fontSize: '0.9rem'
-                           }}>
-                              {msg.text}
-                           </div>
-                        </div>
-                     ))}
-                     {loading && <div style={{ alignSelf: 'flex-start', padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '15px', fontSize: '0.8rem', opacity: 0.5 }}>Thinking...</div>}
-                  </div>
-
-                  <form onSubmit={askAI} style={{ padding: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', gap: '0.8rem' }}>
-                     <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Type your question..." style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '0.8rem 1.2rem', color: 'white' }} disabled={loading} />
-                     <button type="submit" disabled={loading} className="btn-primary" style={{ width: '45px', height: '45px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <i className="fas fa-paper-plane"></i>
-                     </button>
-                  </form>
+               <div>
+                  <SmartAssistant token={token} />
                </div>
             </div>
          </div>
