@@ -171,7 +171,7 @@ function Dashboard({ role, token, logout }) {
    if (role === 'MANAGER') return <ManagerDashboard token={token} logout={logout} />;
    if (role === 'INSTRUCTOR') return <InstructorDashboard token={token} logout={logout} />;
    if (role === 'STUDENT') return <StudentDashboard token={token} logout={logout} />;
-   if (role === 'PARENT') return <div className="dashboard"><h2>Parent Dashboard</h2><p>View your child's pending and completed homework.</p></div>;
+   if (role === 'PARENT') return <ParentDashboard token={token} logout={logout} />;
    return <div>Loading Dashboard...</div>;
 }
 
@@ -1996,7 +1996,7 @@ function DailyMonitoringView({ token }) {
 
       useEffect(() => {
          const headers = { 'Authorization': `Bearer ${token}` };
-         fetch(`${API_BASE_URL}/api/organizations/`, { headers }).then(res => res.json()).then(data => data && setOrg(data[0]));
+         fetch(`${API_BASE_URL}/api/organizations/mine/`, { headers }).then(res => res.json()).then(data => data && setOrg(data));
          fetch(`${API_BASE_URL}/api/subjects/`, { headers }).then(res => res.json()).then(setSubjects);
          
          let url = `${API_BASE_URL}/api/timetables/`;
@@ -2372,6 +2372,124 @@ function DailyMonitoringView({ token }) {
                   <p>Please contact your institution manager to link your profile to a classroom.</p>
                </div>
             )}
+         </div>
+      );
+   }
+
+   function ParentDashboard({ token }) {
+      const [query, setQuery] = useState('');
+      const [history, setHistory] = useState([]);
+      const [loading, setLoading] = useState(false);
+      const [children, setChildren] = useState([]);
+
+      useEffect(() => {
+         fetch(`${API_BASE_URL}/api/students/`, { headers: { 'Authorization': `Bearer ${token}` } })
+            .then(res => res.json())
+            .then(setChildren);
+      }, [token]);
+
+      const askAI = async (e) => {
+         e.preventDefault();
+         const cleanQuery = query.trim().replace(/[{}<>]/g, '').slice(0, 500);
+         if (!cleanQuery) return;
+
+         const userMsg = { role: 'user', text: cleanQuery };
+         setHistory(prev => [...prev, userMsg]);
+         setLoading(true);
+         setQuery('');
+
+         try {
+            const res = await fetch(`${API_BASE_URL}/api/parent/ask/`, {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+               body: JSON.stringify({ query: userMsg.text })
+            });
+            const data = await res.json();
+            setHistory(prev => [...prev, { role: 'ai', text: String(data.answer || data.error || 'No response received') }]);
+         } catch (err) {
+            setHistory(prev => [...prev, { role: 'ai', text: 'Sorry, I encountered an error connecting to the AI service.' }]);
+         } finally { setLoading(false); }
+      };
+
+      return (
+         <div className="dashboard animate-fadeIn">
+            <div style={{ marginBottom: '2.5rem' }}>
+               <h2 style={{ fontSize: '2.25rem' }}>Parent <span className="nav-brand" style={{ fontSize: 'inherit' }}>Portal</span></h2>
+               <p style={{ color: 'var(--text-muted)' }}>Stay updated with your children's progress and activities.</p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '2.5rem' }} className="grid-mobile-stack">
+               <div>
+                  <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                     <i className="fas fa-user-graduate" style={{ color: 'var(--primary-color)' }}></i> Your Children
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                     {children.length > 0 ? children.map(child => (
+                        <div key={child.id} className="dashboard-card" style={{ border: '1px solid rgba(255,255,255,0.05)' }}>
+                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                              <div>
+                                 <h4 style={{ margin: 0, fontSize: '1.2rem' }}>{child.first_name} {child.last_name}</h4>
+                                 <p style={{ opacity: 0.5, margin: '0.2rem 0' }}>Class: {child.classroom_name || 'Not assigned'}</p>
+                              </div>
+                              <span className="badge badge-success">Active</span>
+                           </div>
+                           <hr style={{ opacity: 0.1, margin: '1rem 0' }} />
+                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.9rem' }}>
+                              <div style={{ padding: '0.8rem', background: 'rgba(255,255,255,0.03)', borderRadius: '10px' }}>
+                                 <div style={{ opacity: 0.5 }}>Attendance</div>
+                                 <strong>98%</strong>
+                              </div>
+                              <div style={{ padding: '0.8rem', background: 'rgba(255,255,255,0.03)', borderRadius: '10px' }}>
+                                 <div style={{ opacity: 0.5 }}>Pending Tasks</div>
+                                 <strong>3</strong>
+                              </div>
+                           </div>
+                        </div>
+                     )) : <div className="dashboard-card" style={{ textAlign: 'center', opacity: 0.5 }}>No children linked.</div>}
+                  </div>
+               </div>
+
+               <div className="dashboard-card" style={{ display: 'flex', flexDirection: 'column', height: '600px', padding: 0, overflow: 'hidden', border: '1px solid var(--primary-color)', background: 'rgba(15,23,42,0.6)' }}>
+                  <div style={{ padding: '1.5rem', background: 'linear-gradient(to right, rgba(192,132,252,0.1), transparent)', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                     <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                        <i className="fas fa-robot"></i>
+                     </div>
+                     <div>
+                        <h4 style={{ margin: 0 }}>Smart School Assistant</h4>
+                        <p style={{ margin: 0, fontSize: '0.75rem', opacity: 0.6 }}>Ask about homework or lessons</p>
+                     </div>
+                  </div>
+
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                     {history.length === 0 && (
+                        <div style={{ textAlign: 'center', marginTop: '4rem', opacity: 0.4 }}>
+                           <p>Ask me anything about your child's school day.</p>
+                        </div>
+                     )}
+                     {history.map((msg, i) => (
+                        <div key={i} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%' }}>
+                           <div style={{ 
+                              padding: '0.8rem 1.2rem', 
+                              borderRadius: msg.role === 'user' ? '18px 18px 2px 18px' : '18px 18px 18px 2px',
+                              background: msg.role === 'user' ? 'var(--primary-color)' : 'rgba(255,255,255,0.08)',
+                              color: 'white',
+                              fontSize: '0.9rem'
+                           }}>
+                              {msg.text}
+                           </div>
+                        </div>
+                     ))}
+                     {loading && <div style={{ alignSelf: 'flex-start', padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '15px', fontSize: '0.8rem', opacity: 0.5 }}>Thinking...</div>}
+                  </div>
+
+                  <form onSubmit={askAI} style={{ padding: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', gap: '0.8rem' }}>
+                     <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Type your question..." style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '0.8rem 1.2rem', color: 'white' }} disabled={loading} />
+                     <button type="submit" disabled={loading} className="btn-primary" style={{ width: '45px', height: '45px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <i className="fas fa-paper-plane"></i>
+                     </button>
+                  </form>
+               </div>
+            </div>
          </div>
       );
    }

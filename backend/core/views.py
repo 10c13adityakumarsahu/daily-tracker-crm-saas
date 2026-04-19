@@ -5,6 +5,88 @@ from .models import *
 from .serializers import *
 import requests
 import threading
+import os
+import google.generativeai as genai
+
+def sanitize_input(text):
+    if not text: return ""
+    import re
+    # 1. Total rejection for common injection keywords (Persona Defense)
+    forbidden = ['ignore', 'instruction', 'system', 'prompt', 'developer', 'secret', 'rule', 'override', 'reset', 'bypass']
+    if any(word in text.lower() for word in forbidden):
+        return None # Result in a 400 error
+    
+    # 2. Strict character filtering
+    # Only allow basic alphanumeric and common punctuation
+    clean = re.sub(r'[^a-zA-Z0-9\s?.,!]', '', text)
+    
+    return clean.strip()[:300] # Even tighter limit
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def parent_ask_ai(request):
+    user = request.user
+    if user.role != 'PARENT':
+        return Response({'error': 'Only parents can access this feature'}, status=403)
+    
+    parent = getattr(user, 'parent_profile', None)
+    if not parent:
+        return Response({'error': 'Parent profile not found'}, status=404)
+    
+    raw_query = request.data.get('query')
+    query = sanitize_input(raw_query)
+    
+    if query is None:
+        return Response({'error': 'Security Protocol Violation: Restricted keywords detected.'}, status=400)
+    
+    if not query:
+        return Response({'error': 'A valid query is required'}, status=400)
+    
+    # 1. Gather context
+    children = parent.children.all()
+    context_parts = []
+    
+    for child in children:
+        child_context = f"Student: {child.first_name} {child.last_name} (Class: {child.classroom.name if child.classroom else 'N/A'})\n"
+        if child.classroom:
+            homeworks = Homework.objects.filter(session__timetable__subject__classroom=child.classroom).order_by('-deadline')[:5]
+            child_context += "Recent Homework:\n"
+            for hw in homeworks:
+                child_context += f"- {hw.title}: {hw.description} (Deadline: {hw.deadline})\n"
+            
+            tasks = DailyTask.objects.filter(classroom=child.classroom).order_by('-date')[:5]
+            child_context += "Recent Lessons/Tasks:\n"
+            for t in tasks:
+                child_context += f"- {t.date} [{t.get_category_display()}]: {t.topic} - {t.description}\n"
+        
+        context_parts.append(child_context)
+    
+    full_context = "\n".join(context_parts)
+    
+    # 2. Call Gemini
+    api_key = os.getenv('GEMINI_API_KEY')
+    model_name = os.getenv('GEMINI_MODEL', 'gemini-1.5-flash')
+    
+    if not api_key or api_key == 'your_gemini_api_key_here':
+         return Response({'answer': "Gemini API key is not configured. Please add it to the .env file."})
+
+    try:
+        # Load prompt from file
+        prompt_path = os.path.join(os.path.dirname(__file__), 'ai_prompts', 'parent_assistant.txt')
+        with open(prompt_path, 'r') as f:
+            prompt_template = f.read()
+        
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(model_name)
+        
+        final_prompt = prompt_template.format(context=full_context, query=query)
+        
+        response = model.generate_content(final_prompt)
+        # Ensure plain text (strip markdown if necessary, although Gemini usually obeys)
+        clean_response = response.text.replace('**', '').replace('__', '').replace('`', '')
+        return Response({'answer': clean_response.strip()})
+    except Exception as e:
+        return Response({'error': 'The AI assistant is currently unavailable.'}, status=500)
 
 def trigger_webhook(instance, action='created'):
     if not instance.organization.webhook_url:
@@ -203,7 +285,8 @@ class StudentViewSet(viewsets.ModelViewSet):
         if user.role == 'STUDENT':
             student = getattr(user, 'student_profile', None)
             if student:
-                return qs.filter(classroom=student.classroom)
+                # Return their own profile first or exclusively
+                return qs.filter(user=user)
 
         return Student.objects.none()
 
@@ -306,14 +389,53 @@ class TimetableViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     def get_queryset(self):
         qs = Timetable.objects.all()
+        user = self.request.user
+        
+        # Enforce Role-Based Access
+        if user.role == 'STUDENT':
+            student = getattr(user, 'student_profile', None)
+            if student:
+                qs = qs.filter(subject__classroom=student.classroom)
+            else:
+                return Timetable.objects.none()
+        elif user.role == 'INSTRUCTOR':
+            instructor = getattr(user, 'instructor_profile', None)
+            if instructor:
+                # By default, show instructor's own timetable unless another filter is applied
+                classroom = get_query_param(self.request, 'classroom')
+                instr_id = get_query_param(self.request, 'instructor')
+                if classroom:
+                    qs = qs.filter(subject__classroom_id=classroom)
+                elif instr_id:
+                    qs = qs.filter(instructor_id=instr_id)
+                else:
+                    qs = qs.filter(instructor=instructor)
+            else:
+                return Timetable.objects.none()
+        
+        # Additional manual filters for Manager/Admin
         classroom = get_query_param(self.request, 'classroom')
-        if classroom: qs = qs.filter(subject__classroom_id=classroom)
+        if classroom and user.role in ['MANAGER', 'ADMIN']: 
+            qs = qs.filter(subject__classroom_id=classroom)
+            
         instructor = get_query_param(self.request, 'instructor')
-        if instructor: qs = qs.filter(instructor_id=instructor)
+        if instructor and user.role in ['MANAGER', 'ADMIN']: 
+            qs = qs.filter(instructor_id=instructor)
+            
         org = get_query_param(self.request, 'organization')
-        if org: qs = qs.filter(organization_id=org)
-        return qs
-    
+        if org: 
+            qs = qs.filter(organization_id=org)
+        elif user.role != 'ADMIN':
+            # Default to user's org if not specified
+            if user.role == 'MANAGER':
+                qs = qs.filter(organization__manager=user)
+            elif user.role == 'STUDENT' and hasattr(user, 'student_profile'):
+                qs = qs.filter(organization=user.student_profile.organization)
+            elif user.role == 'INSTRUCTOR' and hasattr(user, 'instructor_profile'):
+                qs = qs.filter(organization=user.instructor_profile.organization)
+
+        return qs.distinct()
+
     def perform_create(self, serializer):
         subject = serializer.validated_data['subject']
         instructor = serializer.validated_data.get('instructor')
@@ -358,17 +480,22 @@ class InstructorViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        user = self.request.user
         qs = Instructor.objects.all()
-        if self.request.user.role == 'ADMIN':
+        if user.role == 'ADMIN':
             org_id = get_query_param(self.request, 'organization')
             if org_id:
                 qs = qs.filter(organization_id=org_id)
             return qs
         
-        if self.request.user.role == 'MANAGER':
-            org = getattr(self.request.user, 'managed_org', None)
+        if user.role == 'MANAGER':
+            org = getattr(user, 'managed_org', None)
             if org:
                 return qs.filter(organization=org)
+        
+        if user.role == 'INSTRUCTOR':
+            # Allow instructor to see their own profile
+            return qs.filter(user=user)
         
         return Instructor.objects.none()
 
