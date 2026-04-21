@@ -11,16 +11,19 @@ from google import genai
 def sanitize_input(text):
     if not text: return ""
     import re
-    # 1. Total rejection for common injection keywords (Persona Defense)
-    forbidden = ['ignore', 'instruction', 'system', 'prompt', 'developer', 'secret', 'rule', 'override', 'reset', 'bypass']
+    # 1. Total rejection for common injection and administrative keywords
+    forbidden = [
+        'ignore', 'instruction', 'system', 'prompt', 'developer', 'secret', 'rule', 
+        'override', 'reset', 'bypass', 'admin', 'manager', 'billing', 'license', 
+        'config', 'database', 'key', 'password', 'login', 'token'
+    ]
     if any(word in text.lower() for word in forbidden):
         return None # Result in a 400 error
     
-    # 2. Strict character filtering
-    # Only allow basic alphanumeric and common punctuation
-    clean = re.sub(r'[^a-zA-Z0-9\s?.,!]', '', text)
+    # 2. Relaxed character filtering for better NLP (Allow common sentence symbols)
+    clean = re.sub(r'[^a-zA-Z0-9\s?.,!@#%^&*()\-+=:;\"\'/\[\]]', '', text)
     
-    return clean.strip()[:300] # Even tighter limit
+    return clean.strip()[:500] # Extend length for more complex queries
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
@@ -30,6 +33,9 @@ def user_ask_ai(request):
         return Response({'error': 'Role not authorized for AI Assistant'}, status=403)
     
     query = sanitize_input(request.data.get('query'))
+    history = request.data.get('history', [])
+    ui_context = request.data.get('context', {}) # {active_tab: '...', selected_date: '...'}
+    
     if query is None:
         return Response({'error': 'Security Protocol Violation: Restricted keywords detected.'}, status=400)
     if not query:
@@ -47,49 +53,167 @@ def user_ask_ai(request):
         if not student: return Response({'error': 'Student profile not found'}, status=404)
         targets = [student]
 
+    from django.utils import timezone
+    now = timezone.now()
+    today = now.date()
+    
     for target in targets:
-        target_context = f"Student: {target.first_name} {target.last_name} (Class: {target.classroom.name if target.classroom else 'N/A'})\n"
-        if target.classroom:
-            homeworks = Homework.objects.filter(session__timetable__subject__classroom=target.classroom).order_by('-deadline')[:5]
-            target_context += "Recent Homework:\n"
-            for hw in homeworks:
-                target_context += f"- {hw.title}: {hw.description} (Deadline: {hw.deadline})\n"
-            
-            tasks = DailyTask.objects.filter(classroom=target.classroom).order_by('-date')[:5]
-            target_context += "Recent Lessons/Tasks:\n"
-            for t in tasks:
-                target_context += f"- {t.date} [{t.get_category_display()}]: {t.topic} - {t.description}\n"
+        org_name = target.organization.name if target.organization else "Your School"
+        target_context = f"!!! IMPORTANT: TODAY IS {now.strftime('%Y-%m-%d')}. ANY DATE BEFORE THIS IS IN THE PAST !!!\n"
+        target_context += f"School: {org_name} | Student: {target.first_name} {target.last_name}\n"
+        target_context += f"USER_UI_STATE: Currently viewing the {ui_context.get('active_tab', 'N/A')} section. Their screen is currently focused on the date: {ui_context.get('selected_date', 'N/A')}\n\n"
         
+        if target.classroom:
+            # 0. Instructors
+            subjects = Subject.objects.filter(classroom=target.classroom)
+            target_context += "INSTRUCTORS:\n"
+            for sub in subjects:
+                instrs = ", ".join([f"{i.user.first_name} {i.user.last_name}" for i in sub.instructors.all()])
+                target_context += f"- {sub.name}: {instrs}\n"
+            
+            # 1. Active Homework
+            pending_hw = Homework.objects.filter(
+                session__timetable__subject__classroom=target.classroom,
+                deadline__gte=now
+            ).order_by('deadline')
+            
+            target_context += "\n[ACTIVE HOMEWORK - DUE SOON]:\n"
+            if pending_hw.exists():
+                for hw in pending_hw:
+                    target_context += f"- {hw.title} (DUE: {hw.deadline.strftime('%Y-%m-%d')})\n"
+            else:
+                target_context += "- None (All caught up!)\n"
+
+            # 2. History
+            past_hw = Homework.objects.filter(
+                session__timetable__subject__classroom=target.classroom,
+                deadline__lt=now
+            ).order_by('-deadline')[:3]
+            
+            target_context += "\n[OLD / COMPLETED HISTORY]:\n"
+            for hw in past_hw:
+                 target_context += f"- {hw.title} (FINISHED: {hw.deadline.strftime('%Y-%m-%d')})\n"
+
+            # 3. Lessons
+            tasks = DailyTask.objects.filter(classroom=target.classroom).order_by('-date')[:5]
+            target_context += "\n[RECENT LESSONS]:\n"
+            for t in tasks:
+                target_context += f"- {t.date}: {t.topic}\n"
+        
+        # Advanced context search (Keyword-RAG)
+        # Extract meaningful keywords from query for deeper search
+        keywords = [w for w in query.split() if len(w) > 3]
+        extra_context = ""
+        if keywords and target.classroom:
+            from django.db.models import Q
+            task_query = Q()
+            hw_query = Q()
+            for kw in keywords:
+                task_query |= Q(topic__icontains=kw) | Q(description__icontains=kw)
+                hw_query |= Q(title__icontains=kw) | Q(description__icontains=kw)
+            
+            relevant_tasks = DailyTask.objects.filter(classroom=target.classroom).filter(task_query).distinct()[:5]
+            relevant_hw = Homework.objects.filter(session__timetable__subject__classroom=target.classroom).filter(hw_query).distinct()[:5]
+            
+            if relevant_tasks.exists() or relevant_hw.exists():
+                extra_context += "\n[MATCHING HISTORICAL RECORDS]:\n"
+                for rt in relevant_tasks:
+                   extra_context += f"- Classwork Date: {rt.date} | Topic: {rt.topic} (Summary: {rt.description})\n"
+                for hw in relevant_hw:
+                   extra_context += f"- Past Homework: {hw.title} (Deadline: {hw.deadline.strftime('%Y-%m-%d')})\n"
+        
+        target_context += extra_context
         context_parts.append(target_context)
     
     full_context = "\n".join(context_parts)
     
     # 2. Call Gemini
     api_key = os.getenv('GEMINI_API_KEY')
-    model_name = os.getenv('GEMINI_MODEL', 'gemini-flash-latest').strip()
+    model_name = os.getenv('GEMINI_MODEL', 'gemini-2.0-flash').strip()
     
+    # Ensure model_name just has the ID if it was prefixed
+    if "/" in model_name:
+        model_name = model_name.split("/")[-1]
+
     if not api_key or api_key == 'your_gemini_api_key_here':
          return Response({'answer': "Gemini API key is not configured. Please add it to the .env file."})
 
     try:
-        # Load prompt from file
-        prompt_path = os.path.join(os.path.dirname(__file__), 'ai_prompts', 'parent_assistant.txt')
-        with open(prompt_path, 'r') as f:
+        base_dir = os.path.dirname(__file__)
+        prompt_path = os.path.join(base_dir, 'ai_prompts', 'parent_assistant.txt')
+        
+        if not os.path.exists(prompt_path):
+            return Response({'error': f'Configuration Error: Prompt template missing at {prompt_path}'}, status=500)
+
+        with open(prompt_path, 'r', encoding='utf-8') as f:
             prompt_template = f.read()
         
-        client = genai.Client(api_key=api_key)
-        final_prompt = prompt_template.format(context=full_context, query=query)
+        # 2. Setup AI Persona and System Instructions
+        system_instruction = prompt_template.split("### CONTEXT")[0].strip().format(today=today.strftime('%Y-%m-%d'))
         
-        response = client.models.generate_content(
-            model=model_name,
-            contents=final_prompt
-        )
+        # 3. Create Client and Chat
+        client = genai.Client(api_key=api_key)
+        final_prompt = prompt_template.format(context=full_context, query=query, today=today.strftime('%Y-%m-%d'))
+        
+        # Format history turns correctly for the SDK
+        chat_history = []
+        for h in history[-8:]: # Keep slightly more history for better NLP context
+             chat_history.append({
+                 'role': 'user' if h['role'] == 'user' else 'model',
+                 'parts': [{'text': h['text']}]
+             })
+        
+        # The user's current message contains the fresh context and the query
+        current_query_with_context = f"### CONTEXT\n{full_context}\n\n### USER QUERY\n{query}"
+        
+        # Final call using system_instruction for identity and history for thread
+        try:
+            # We try with system_instruction first (Modern Gemini way)
+            response = client.models.generate_content(
+                model=model_name,
+                contents=chat_history + [{'role': 'user', 'parts': [{'text': current_query_with_context}]}],
+                config={
+                    'system_instruction': system_instruction,
+                    'temperature': 0.3,
+                    'top_p': 0.8,
+                }
+            )
+        except Exception as e:
+            # Fallback for models that don't support system_instruction (like Gemma)
+            if "Developer instruction" in str(e) or "INVALID_ARGUMENT" in str(e):
+                combined_query = f"{system_instruction}\n\n{current_query_with_context}"
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=chat_history + [{'role': 'user', 'parts': [{'text': combined_query}]}],
+                    config={
+                        'temperature': 0.3,
+                        'top_p': 0.8,
+                    }
+                )
+            else:
+                raise e # Re-raise if it's a different error
+        
+        if not response or not response.text:
+            return Response({'error': 'The AI returned an empty response. Please try a more specific question.'}, status=500)
+
         # Ensure plain text (strip markdown if necessary)
-        clean_response = response.text.replace('**', '').replace('__', '').replace('`', '')
-        return Response({'answer': clean_response.strip()})
+        try:
+            import re
+            r = response.text
+            r = r.replace('**', '').replace('__', '').replace('`', '').replace('_', '')
+            r = r.replace('###', ' ').replace('##', ' ').replace('#', ' ')
+            r = re.sub(r'^\s*\*\s+', '- ', r, flags=re.MULTILINE)
+            r = r.replace('*', '')
+            r = re.sub(r'\n{3,}', '\n\n', r)
+            return Response({'answer': r.strip()})
+        except Exception as text_err:
+            return Response({'error': 'The AI response is being processed differently. Please refresh.'}, status=500)
+
     except Exception as e:
-        print(f"AI Assistant Error: {str(e)}")
-        return Response({'error': 'The AI assistant is currently unavailable.'}, status=500)
+        error_msg = str(e)
+        print(f"AI Assistant Error: {error_msg}")
+        # Standard user-friendly error message
+        return Response({'error': 'The AI assistant is taking a short break to process the new curriculum. Please try again in a moment.'}, status=500)
 
 def trigger_webhook(instance, action='created'):
     if not instance.organization.webhook_url:

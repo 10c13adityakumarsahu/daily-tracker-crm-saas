@@ -42,18 +42,41 @@ function App() {
    return (
       <div className="app-container">
          {!token && isLanding && (
-            <nav className="navbar landing-nav">
-               <div className="nav-brand">DailyTracker <span style={{ fontWeight: 200, opacity: 0.6 }}>SaaS</span></div>
+            <nav className="land-nav" style={{
+               position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
+               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+               padding: '18px 60px', background: 'rgba(13,15,20,0.85)',
+               backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.04)'
+            }}>
+               <div className="logo-mark" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '36px', height: '36px' }}>
+                     <rect width="40" height="40" rx="10" fill="#F5A623"/>
+                     <path d="M8 28L14 14L20 22L26 12L32 28" stroke="#0D0F14" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                     <circle cx="20" cy="22" r="3" fill="#0D0F14"/>
+                     <path d="M8 32H32" stroke="#0D0F14" strokeWidth="2" strokeLinecap="round" opacity="0.4"/>
+                  </svg>
+                  <span className="logo-text" style={{ fontSize: '20px', fontWeight: 700, color: 'var(--white)', letterSpacing: '-0.5px' }}>
+                     upgrade<span style={{ color: 'var(--amber)' }}>fied</span>
+                  </span>
+               </div>
                <div className="nav-links">
-                  <Link to="/login">Login</Link>
-                  <Link to="/signup" className="btn-primary" style={{ padding: '0.5rem 1.25rem' }}>Get Started</Link>
+                  <Link to="/login" style={{ color: 'var(--soft)', textDecoration: 'none', fontSize: '15px' }}>Login</Link>
+                  <Link to="/signup" className="btn-primary" style={{ padding: '9px 22px', borderRadius: '8px', border: 'none', background: 'var(--amber)', color: '#0D0F14', fontWeight: 700, textDecoration: 'none' }}>Get Started</Link>
                </div>
             </nav>
          )}
 
          {token && (
-            <nav className="navbar">
-               <div className="nav-brand">DailyTracker <span style={{ fontWeight: 200, opacity: 0.6 }}>SaaS</span></div>
+            <nav className="navbar" style={{ background: 'var(--ink2)', borderBottom: '1px solid var(--rim)' }}>
+               <div className="logo-mark" style={{ display: 'flex', alignItems: 'center', gap: '10px' }} onClick={() => navigate('/')}>
+                  <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '30px', height: '30px' }}>
+                     <rect width="40" height="40" rx="10" fill="#F5A623"/>
+                     <path d="M8 28L14 14L20 22L26 12L32 28" stroke="#0D0F14" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <span className="logo-text" style={{ fontSize: '18px', fontWeight: 700, color: 'var(--white)' }}>
+                     upgrade<span style={{ color: 'var(--amber)' }}>fied</span>
+                  </span>
+               </div>
                <div className={`nav-links ${mobileMenuOpen ? 'mobile-show' : ''}`}>
                   <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)} className={window.location.pathname === '/dashboard' ? 'active' : ''}>Dashboard</Link>
                   <button onClick={() => { logout(); setMobileMenuOpen(false); }} className="btn-logout">
@@ -92,9 +115,9 @@ function NotFound() {
             className="glass-card"
             style={{ maxWidth: '600px', margin: '0 auto', padding: '5rem' }}
          >
-            <h1 style={{ fontSize: '8rem', margin: 0, background: 'linear-gradient(135deg, #134E4A, #9D174D)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>404</h1>
-            <h2 style={{ fontSize: '2rem', marginBottom: '1rem' }}>Page Lost in Orbit</h2>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '3rem', fontSize: '1.2rem' }}>
+            <h1 style={{ fontSize: '8rem', margin: 0, background: 'var(--grad)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>404</h1>
+            <h2 style={{ fontSize: '2rem', marginBottom: '1rem', color: 'var(--white)' }}>Page Lost in Orbit</h2>
+            <p style={{ color: 'var(--soft)', marginBottom: '3rem', fontSize: '1.2rem' }}>
                The page you are looking for doesn't exist or has been moved to another dimension.
             </p>
             <button className="btn-primary" onClick={() => navigate('/')}>Return to Base</button>
@@ -280,7 +303,7 @@ function AdminDashboard({ token }) {
       <div className="dashboard animate-fadeIn">
          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2.5rem' }}>
             <div>
-               <h2 style={{ fontSize: '2.25rem' }}>Licensing & Account <span className="nav-brand" style={{ fontSize: '2.25rem' }}>Control</span></h2>
+               <h2 style={{ fontSize: '2.25rem', color: 'var(--white)' }}>Licensing & Account <span style={{ color: 'var(--amber)' }}>Control</span></h2>
                <p style={{ color: 'var(--text-muted)' }}>Manage organization access, verify renewals, and monitor payments.</p>
             </div>
          </div>
@@ -352,6 +375,34 @@ function AdminDashboard({ token }) {
       </div>
    );
 }
+
+
+const SidebarLink = ({ active, onClick, icon, label }) => (
+   <button
+      onClick={onClick}
+      style={{
+         display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px',
+         color: active ? 'var(--amber)' : 'var(--soft)', background: active ? 'var(--amber-glow)' : 'transparent',
+         border: active ? '1px solid var(--amber-rim)' : '1px solid transparent',
+         textDecoration: 'none', fontSize: '14px', marginBottom: '2px', transition: 'all 0.2s',
+         width: '100%', cursor: 'pointer', textAlign: 'left'
+      }}
+   >
+      <span style={{ fontSize: '16px', width: '20px', textAlign: 'center' }}>{icon}</span>
+      {label}
+   </button>
+);
+
+const MetricCard = ({ label, value, change, up, color, status }) => (
+   <div className="metric-card" style={{ background: 'var(--ink2)', border: '1px solid var(--rim)', borderRadius: '14px', padding: '22px', position: 'relative', overflow: 'hidden' }}>
+      <div className="metric-label" style={{ fontSize: '12px', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>{label}</div>
+      <div className="metric-value" style={{ fontFamily: 'Bricolage Grotesque, sans-serif', fontSize: status ? '22px' : '36px', fontWeight: 800, color: 'var(--white)', lineHeight: 1, marginBottom: '6px' }}>
+         {status ? <span className={`status-badge sb-active`} style={{ fontSize: '12px', verticalAlign: 'middle' }}>● {value}</span> : value}
+      </div>
+      <div style={{ fontSize: '12px', color: up ? 'var(--teal)' : 'var(--soft)' }}>{change}</div>
+      <div style={{ position: 'absolute', top: 0, right: 0, width: '80px', height: '80px', borderRadius: '50%', opacity: 0.08, background: `var(--${color})`, transform: 'translate(20%, -20%)' }}></div>
+   </div>
+);
 
 function ManagerDashboard({ token, logout }) {
    const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -780,201 +831,228 @@ function ManagerDashboard({ token, logout }) {
    const daysLeft = getDaysLeft();
 
    return (
-      <div className="dashboard-container" style={{display: 'flex', minHeight: '100vh', position: 'relative' }}>
-      {/* Sidebar Overlay */}
-      <div className={`sidebar-overlay ${showMobileMenu ? 'visible' : ''}`} onClick={() => setShowMobileMenu(false)} />
-      
-      {/* Hamburger Toggle */}
-      <button className="navbar-hamburger" onClick={() => setShowMobileMenu(!showMobileMenu)} style={{position: 'fixed', top: '15px', right: '20px', zIndex: 1100}}>
-            <i className={`fas ${showMobileMenu ? 'fa-times' : 'fa-bars'}`}></i>
-      </button>
-         {/* SaaS Sidebar */}
-         <div className={`sidebar ${showMobileMenu ? 'mobile-open' : ''}`} style={{ width: '280px', background: 'rgba(255,255,255,0.03)', borderRight: '1px solid var(--border-color)', padding: '2rem 1.5rem', display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh' }}>
-            {org && (
-               <div style={{ marginBottom: '2.5rem' }}>
-                  <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>{org.name}</h2>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                     <span className="badge" style={{ background: org.subscription_plan === 'FREE' ? 'rgba(255,165,0,0.1)' : 'rgba(16,185,129,0.1)', color: org.subscription_plan === 'FREE' ? 'orange' : '#10B981' }}>
-                        {org.subscription_plan}
-                     </span>
-                     {org.has_portal_access && daysLeft !== null && (
-                        <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>{daysLeft} Days Left</span>
-                     )}
+      <div className="dashboard-container" style={{ display: 'flex', minHeight: '100vh', background: 'var(--ink)' }}>
+         {/* Sidebar Overlay */}
+         <div className={`sidebar-overlay ${showMobileMenu ? 'visible' : ''}`} onClick={() => setShowMobileMenu(false)} />
+         
+         {/* SIDEBAR */}
+         <aside className={`sidebar ${showMobileMenu ? 'mobile-open' : ''}`} style={{ width: '260px', background: 'var(--ink2)', borderRight: '1px solid var(--rim)', display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh', zIndex: 100 }}>
+            <div style={{ padding: '24px 20px', borderBottom: '1px solid var(--rim)' }}>
+               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => navigate('/')}>
+                  <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '36px', height: '36px' }}>
+                    <rect width="40" height="40" rx="10" fill="#F5A623"/>
+                    <path d="M8 28L14 14L20 22L26 12L32 28" stroke="#0D0F14" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <span className="logo-text" style={{ fontSize: '20px', fontWeight: 700, color: 'var(--white)', letterSpacing: '-0.5px' }}>
+                     upgrade<span style={{ color: 'var(--amber)' }}>fied</span>
+                  </span>
+               </div>
+               
+               {org && (
+                  <div style={{ marginTop: '16px' }}>
+                     <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--white)' }}>{org.name}</div>
+                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'var(--amber-glow)', border: '1px solid var(--amber-rim)', borderRadius: '20px', padding: '3px 10px', marginTop: '4px' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--amber)', fontWeight: 700 }}>{org.subscription_plan} · {daysLeft} days left</span>
+                     </div>
+                  </div>
+               )}
+            </div>
+
+            <nav style={{ flex: 1, padding: '20px 12px', overflowY: 'auto' }}>
+                <div style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', padding: '0 8px', margin: '20px 0 8px' }}>Essential</div>
+                <SidebarLink active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} icon={<i className="fas fa-home"></i>} label="Dashboard" />
+                <SidebarLink active={activeTab === 'renew'} onClick={() => setActiveTab('renew')} icon={<i className="fas fa-key"></i>} label="Renew License" />
+                
+                <div style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', padding: '0 8px', margin: '20px 0 8px' }}>Academics</div>
+                <SidebarLink active={activeTab === 'master'} onClick={() => setActiveTab('master')} icon={<i className="fas fa-calendar-alt"></i>} label="Master Schedule" />
+                <SidebarLink active={activeTab === 'subjects'} onClick={() => setActiveTab('subjects')} icon={<i className="fas fa-book"></i>} label="Course Bank" />
+                <SidebarLink active={activeTab === 'classrooms'} onClick={() => setActiveTab('classrooms')} icon={<i className="fas fa-school"></i>} label="Classrooms Hub" />
+                
+                <div style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', padding: '0 8px', margin: '20px 0 8px' }}>People</div>
+                <SidebarLink active={activeTab === 'instructors'} onClick={() => setActiveTab('instructors')} icon={<i className="fas fa-chalkboard-teacher"></i>} label="Staff Roster" />
+                <SidebarLink active={activeTab === 'students'} onClick={() => setActiveTab('students')} icon={<i className="fas fa-user-graduate"></i>} label="Student Body" />
+                <SidebarLink active={activeTab === 'schemas'} onClick={() => setActiveTab('schemas')} icon={<i className="fas fa-database"></i>} label="Model Designer" />
+                
+                <div style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', padding: '0 8px', margin: '20px 0 8px' }}>Operations</div>
+                <SidebarLink active={activeTab === 'monitoring'} onClick={() => setActiveTab('monitoring')} icon={<i className="fas fa-chart-line"></i>} label="Daily Monitoring" />
+                <SidebarLink active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} icon={<i className="fas fa-paper-plane"></i>} label="Parent Reports" />
+                <SidebarLink active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon={<i className="fas fa-cog"></i>} label="Settings" />
+             </nav>
+
+            <div style={{ padding: '16px 12px', borderTop: '1px solid var(--rim)' }}>
+               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px' }}>
+                  <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'var(--amber)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#0D0F14' }}>AD</div>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--white)' }}>Admin</div>
+                    <div style={{ fontSize: '11px', color: 'var(--muted)' }}>School Owner</div>
                   </div>
                </div>
-            )}
+            </div>
+         </aside>
 
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', flex: 1 }}>
-               {[
-                  { id: 'overview', icon: 'home', label: 'Overview' },
-                  { id: 'schemas', icon: 'layer-group', label: 'Schemas' },
-                  { id: 'master', icon: 'th-list', label: 'Master Schedule' },
-                  { id: 'classrooms', icon: 'school', label: 'Classrooms Hub' },
-                  { id: 'subjects', icon: 'book', label: 'Course Bank' },
-                  { id: 'instructors', icon: 'user-tie', label: 'Staff Roster' },
-                  { id: 'students', icon: 'user-graduate', label: 'Student Body' },
-                  { id: 'monitoring', icon: 'calendar-alt', label: 'Daily Monitoring' },
-                  { id: 'profile', icon: 'cog', label: 'School Settings' }
-               ].map(tab => (
-                  <button
-                     key={tab.id}
-                     onClick={() => { setActiveTab(tab.id); setSelectedClassId(null); setShowMobileMenu(false); }}
-                     className={activeTab === tab.id ? 'btn-primary' : 'btn-logout'}
-                     style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '0.8rem 1.2rem' }}
-                  >
-                     <i className={`fas fa-${tab.icon}`} style={{ marginRight: '10px', width: '20px' }}></i>
-                     {tab.label}
-                  </button>
-               ))}
-            </nav>
-
-            {org && (
-               <div style={{ marginTop: '2rem', padding: '1.5rem', background: 'linear-gradient(135deg, rgba(192,132,252,0.1), rgba(236,72,153,0.1))', borderRadius: '16px', border: '1px solid rgba(192,132,252,0.2)' }}>
-                  <h4 style={{ margin: 0, fontSize: '0.9rem' }}>{org.subscription_plan === 'FREE' ? 'Upgrade Plan' : 'Active Plan'}</h4>
-                  <p style={{ fontSize: '0.75rem', opacity: 0.7, margin: '0.5rem 0 1rem 0' }}>
-                     Manage all institutional units with premium access.
-                  </p>
-                  <button
-                     onClick={() => setShowActivateModal(true)}
-                     className={org.is_payment_verified ? "btn-logout" : "btn-primary"}
-                     style={{ width: '100%', fontSize: '0.8rem', padding: '0.6rem' }}
-                  >
-                     {org.subscription_plan === 'FREE' ? (org.is_payment_verified ? 'Activation Pending' : 'Activate License') : 'Renew License'}
-                  </button>
-                  <button 
-                     onClick={logout} 
-                     className="btn-logout" 
-                     style={{ width: '100%', marginTop: '0.8rem', fontSize: '0.8rem', padding: '0.6rem', border: '1px solid rgba(255,255,255,0.1)' }}
-                  >
-                     <i className="fas fa-sign-out-alt" style={{ marginRight: '8px' }}></i> Logout Account
-                  </button>
-               </div>
-            )}
-         </div>
-
-         <div className="manager-main-content" style={{ flex: 1, padding: '2rem 3rem', background: '#080c14', minHeight: '100vh' }}>
-            {activeTab === 'monitoring' && (
-               <DailyMonitoringView token={token} />
-            )}
-            {showActivateModal && (
-               <div className="modal-overlay" style={{ background: 'rgba(0,0,0,0.85)', position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001, padding: '1rem' }}>
-                  <div className="dashboard-card animate-slideUp" style={{ width: '100%', maxWidth: '450px', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
-                     <button onClick={() => setShowActivateModal(false)} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'transparent', border: 'none', color: 'white', cursor: 'pointer' }}><i className="fas fa-times"></i></button>
-                     <h3 className="nav-brand" style={{ fontSize: '1.8rem' }}>Activate Platform</h3>
-                     <p style={{ marginBottom: '2rem' }}>Unlock full institutional capabilities and remove trial limitations.</p>
-                     <div style={{ marginBottom: '1.5rem' }}>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', opacity: 0.7 }}>License Key</label>
-                        <input
-                           value={tempLicense}
-                           onChange={e => setTempLicense(e.target.value)}
-                           placeholder="XXXX-XXXX-XXXX"
-                           style={{ width: '100%', padding: '1rem', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}
-                        />
-                     </div>
-                     <button onClick={applyLicense} className="btn-primary" style={{ width: '100%', padding: '1rem', fontSize: '1rem' }}>Confirm Activation</button>
-                     <hr style={{ margin: '1.5rem 0', opacity: 0.1 }} />
-                     <p style={{ fontSize: '0.85rem', opacity: 0.6 }}>Don't have a key? Contact your account manager or click <strong style={{ color: 'var(--primary-color)', cursor: 'pointer' }} onClick={() => { setShowActivateModal(false); setShowPayment(true) }}>Pay Now</strong> to generate one.</p>
+         {/* MAIN CONTENT AREA */}
+         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+            
+            <div style={{ flex: 1, overflowY: 'auto', background: 'var(--ink)' }}>
+               {/* MAIN HEADER */}
+               <header style={{ padding: '24px 36px', borderBottom: '1px solid var(--rim)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--ink2)', position: 'sticky', top: 0, zIndex: 10 }}>
+                  <div>
+                     <div style={{ fontSize: '14px', color: 'var(--muted)' }}>School Management</div>
+                     <h1 style={{ color: 'var(--white)', fontSize: '18px', margin: 0 }}>{activeTab === 'overview' ? 'Dashboard Overview' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h1>
                   </div>
-               </div>
-            )}
-            {org && !org.has_portal_access && (
-               <div style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid #3B82F6', padding: '1.5rem', borderRadius: '12px', marginBottom: '1.5rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                     <div>
-                        <h4 style={{ margin: 0, color: '#60A5FA' }}>{!org.is_payment_verified ? 'Payment Required' : (org.is_license_generated ? 'Activation Pending' : 'License Under Review')}</h4>
-                        <p style={{ margin: '0.2rem 0 0 0', opacity: 0.8 }}>
-                           {!org.is_payment_verified ? 'Please complete payment to request your license.' : (org.is_license_generated ? 'Check your email for the key and enter below.' : 'Your payment is verified. Admin is generating your key.')}
-                        </p>
-                     </div>
-                     <div style={{ display: 'flex', gap: '1rem' }}>
-                        {!org.is_payment_verified && <button onClick={() => setShowPayment(true)} className="btn-primary">Pay Subscription</button>}
-                        {org.is_license_generated && (
-                           <div style={{ display: 'flex', gap: '0.5rem' }}>
-                              <input value={tempLicense} onChange={e => setTempLicense(e.target.value)} placeholder="Enter Key" style={{ width: '180px' }} />
-                              <button onClick={applyLicense} className="btn-primary">Activate</button>
-                           </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                     <div className="icon-btn-wrap" title="Pending Student Requests">
+                        <div className="icon-btn"><i className="fas fa-bell"></i></div>
+                        {students.filter(s => !s.is_active).length > 0 && (
+                           <div className="notif-count">{students.filter(s => !s.is_active).length}</div>
                         )}
                      </div>
+                     <div className="icon-btn">🔍</div>
+                     <button className="btn-sm btn-sm-amber" onClick={() => { setActiveTab('students'); setShowAddStudent(true); }}>+ Add Student</button>
                   </div>
-               </div>
-            )}
-            {showPayment && org && (
-               <div className="modal-overlay" style={{ background: 'rgba(0,0,0,0.85)', position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
-                  <div className="dashboard-card animate-slideUp" style={{ width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', textAlign: 'center' }}>
-                     <h3 className="nav-brand" style={{ fontSize: '1.8rem' }}>Secure Payment</h3>
-                     <p>Simulated Gateway for {org.name}</p>
- 
-                     <div style={{ display: 'flex', gap: '1rem', margin: '2rem 0' }} className="grid-mobile-stack">
-                        <button onClick={() => setPaymentDuration(1)} className={paymentDuration === 1 ? 'btn-primary' : 'btn-logout'} style={{ flex: 1 }}>Monthly</button>
-                        <button onClick={() => setPaymentDuration(12)} className={paymentDuration === 12 ? 'btn-primary' : 'btn-logout'} style={{ flex: 1 }}>Yearly (Save 20%)</button>
-                     </div>
- 
-                     <div style={{ margin: '1.5rem 0', background: 'rgba(255,255,255,0.05)', padding: '1.5rem', borderRadius: '12px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}><span>Plan:</span> <span>{paymentDuration === 1 ? 'Basic Monthly' : 'PRO Yearly'}</span></div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: 'bold' }}><span>Total Amount:</span> <span style={{ color: '#10B981' }}>${paymentDuration === 1 ? '99.00' : '999.00'}</span></div>
-                     </div>
-                     <input placeholder="Card Number (4242 ...)" readOnly style={{ marginBottom: '1rem', textAlign: 'center', opacity: 0.5 }} />
-                     <button
-                        className="btn-primary"
-                        style={{ width: '100%', padding: '1rem', fontSize: '1.1rem' }}
-                        onClick={processPayment}
-                     >
-                        Accept & Pay ${paymentDuration === 1 ? '99.00' : '999.00'}
-                     </button>
-                     <button className="btn-logout" style={{ marginTop: '1rem' }} onClick={() => setShowPayment(false)}>Cancel Payment</button>
-                  </div>
-               </div>
-            )}
+               </header>
 
-            {activeTab === 'overview' && org && (
-               <div className="animate-fadeIn">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2.5rem' }}>
-                     <div>
-                        <h2 style={{ fontSize: '2.25rem' }}>Dashboard <span className="nav-brand" style={{ fontSize: '2.25rem' }}>Overview</span></h2>
-                        <p style={{ color: 'var(--text-muted)' }}>High-level metrics and system status for <strong>{org.name}</strong>.</p>
-                     </div>
-                  </div>
+               {/* DASHBOARD BODY */}
+               <main style={{ padding: '32px 36px' }}>
+                  {activeTab === 'overview' && org && (
+                     <div className="fade-in">
+                        {/* METRICS ROW */}
+                        <div className="metrics-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '28px' }}>
+                           <MetricCard label="Total Students" value={students.length} change={`${students.filter(s => s.is_active).length} active`} up color="amber" />
+                           <MetricCard label="Staff Members" value={instructors.length} change="Faculty roster" up color="teal" />
+                           <MetricCard label="Active Classes" value={classrooms.length} change="Total classrooms" color="rose" />
+                           <MetricCard label="Portal Status" value={org.has_portal_access ? "LIVE" : "PENDING"} status color="violet" />
+                        </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', marginBottom: '3rem' }} className="stat-grid">
-                     <div className="dashboard-card" style={{ border: '1px solid var(--border-color)' }}>
-                        <div style={{ opacity: 0.6, fontSize: '0.8rem', marginBottom: '0.5rem' }}>TOTAL STUDENTS</div>
-                        <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{students.length}</div>
-                     </div>
-                     <div className="dashboard-card" style={{ border: '1px solid var(--border-color)' }}>
-                        <div style={{ opacity: 0.6, fontSize: '0.8rem', marginBottom: '0.5rem' }}>STAFF MEMBERS</div>
-                        <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{instructors.length}</div>
-                     </div>
-                     <div className="dashboard-card" style={{ border: '1px solid var(--border-color)' }}>
-                        <div style={{ opacity: 0.6, fontSize: '0.8rem', marginBottom: '0.5rem' }}>ACTIVE CLASSES</div>
-                        <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{classrooms.length}</div>
-                     </div>
-                     <div className="dashboard-card" style={{ border: '1px solid var(--border-color)' }}>
-                        <div style={{ opacity: 0.6, fontSize: '0.8rem', marginBottom: '0.5rem' }}>PORTAL STATUS</div>
-                        <div className={`badge ${org.has_portal_access ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '1rem', marginTop: '0.5rem' }}>{org.has_portal_access ? 'ACCEPTS LOGINS' : 'READ ONLY'}</div>
-                     </div>
-                  </div>
+                        {/* DOUBLE COL GRID */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px' }}>
+                           
+                           {/* RECENT STUDENTS */}
+                           <div className="section-card">
+                              <div className="sc-header">
+                                 <div>
+                                    <h3 className="sc-title">Recent Students</h3>
+                                    <p className="sc-subtitle">Latest enrollments</p>
+                                 </div>
+                                 <button className="btn-sm" onClick={() => setActiveTab('students')}>View All</button>
+                              </div>
+                              <table className="data-table">
+                                 <thead>
+                                    <tr>
+                                       <th>Student</th>
+                                       <th>Class</th>
+                                       <th>Roll</th>
+                                       <th>Status</th>
+                                    </tr>
+                                 </thead>
+                                 <tbody>
+                                    {students.slice(0, 5).map((s, i) => (
+                                       <tr key={i}>
+                                          <td>
+                                             <div className="avatar-cell">
+                                                <div className="av" style={{ background: i % 2 === 0 ? 'var(--amber-glow)' : 'var(--teal-glow)', color: i % 2 === 0 ? 'var(--amber)' : 'var(--teal)' }}>
+                                                   {Object.values(s.custom_data || {})[0]?.charAt(0) || 'S'}
+                                                </div>
+                                                <div>
+                                                   <div className="av-name">{Object.values(s.custom_data || {})[0]}</div>
+                                                   <div className="av-email">{s.classroom_name}</div>
+                                                </div>
+                                             </div>
+                                          </td>
+                                          <td>{s.classroom_name?.split('-')[0] || 'Grade 10'}</td>
+                                          <td>{s.registration_number}</td>
+                                          <td><span className={`status-badge ${s.is_active ? 'sb-active' : 'sb-pending'}`}>{s.is_active ? 'Active' : 'Pending'}</span></td>
+                                       </tr>
+                                    ))}
+                                 </tbody>
+                              </table>
+                           </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }} className="dashboard-overview-grid">
-                     <div className="dashboard-card">
-                        <h3>Subscription Metadata</h3>
-                        <div className="info-grid" style={{ marginTop: '1.5rem' }}>
-                           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.8rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>Plan:</span> <strong>{org.subscription_plan}</strong></div>
-                           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.8rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>License Status:</span> <strong>{org.is_license_generated ? 'ISSUED' : 'PENDING'}</strong></div>
-                           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.8rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>Expiration:</span> <strong>{org.subscription_expiry ? new Date(org.subscription_expiry).toLocaleDateString() : 'N/A'}</strong></div>
-                           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.8rem 0' }}><span>Support Tier:</span> <strong style={{ color: 'var(--primary-color)' }}>PRIORITY</strong></div>
+                           {/* TODAY SUMMARY */}
+                           <div className="section-card" style={{ padding: '24px' }}>
+                              <h3 className="sc-title">Today's Activity</h3>
+                              <p className="sc-subtitle" style={{ marginBottom: '24px' }}>
+                                 {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                              </p>
+                              
+                              <div style={{ marginBottom: '24px' }}>
+                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '8px' }}>
+                                    <span>Portal Enrollment</span>
+                                    <span style={{ color: 'var(--white)' }}>{Math.round((students.filter(s => s.is_active).length / (students.length || 1)) * 100)}%</span>
+                                 </div>
+                                 <div className="progress-bar-wrap">
+                                    <div className="progress-bar pb-teal" style={{ width: `${(students.filter(s => s.is_active).length / (students.length || 1)) * 100}%` }}></div>
+                                 </div>
+                              </div>
+
+                              <div style={{ marginBottom: '24px' }}>
+                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '8px' }}>
+                                    <span>Classes Assigned</span>
+                                    <span style={{ color: 'var(--white)' }}>{subjects.filter(s => s.classroom).length} / {subjects.length}</span>
+                                 </div>
+                                 <div className="progress-bar-wrap">
+                                    <div className="progress-bar pb-amber" style={{ width: `${(subjects.filter(s => s.classroom).length / (subjects.length || 1)) * 100}%` }}></div>
+                                 </div>
+                              </div>
+
+                              <div style={{ marginBottom: '24px' }}>
+                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '8px' }}>
+                                    <span>Faculty Allocation</span>
+                                    <span style={{ color: 'var(--white)' }}>{instructors.length > 0 ? 'Optimal' : 'Low'}</span>
+                                 </div>
+                                 <div className="progress-bar-wrap">
+                                    <div className="progress-bar pb-violet" style={{ width: instructors.length > 0 ? '100%' : '10%' }}></div>
+                                 </div>
+                              </div>
+                           </div>
                         </div>
                      </div>
-                     <div className="dashboard-card" style={{ background: 'rgba(192,132,252,0.03)', border: '1px dashed rgba(192,132,252,0.2)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
-                        <i className="fas fa-rocket" style={{ fontSize: '2.5rem', marginBottom: '1rem', opacity: 0.3 }}></i>
-                        <h4>Scalability Actions</h4>
-                        <p style={{ fontSize: '0.85rem', opacity: 0.6 }}>Bulk import or export your student data using our CSV engine.</p>
-                        <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-                           <button className="btn-secondary" onClick={() => setActiveTab('students')}>Go to Student CRM</button>
+                  )}
+
+                  {activeTab === 'renew' && org && (
+                     <div className="fade-in">
+                        <div className="section-card" style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center', padding: '40px' }}>
+                           <div style={{ fontSize: '48px', marginBottom: '20px' }}>🔑</div>
+                           <h2 className="sc-title" style={{ fontSize: '24px', marginBottom: '10px' }}>License Activation</h2>
+                           <p className="sc-subtitle" style={{ marginBottom: '30px' }}>Enter your 16-character institutional deployment key to activate or extend your portal access.</p>
+                           
+                           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
+                              <input 
+                                 value={tempLicense} 
+                                 onChange={e => setTempLicense(e.target.value)} 
+                                 placeholder="XXXX-XXXX-XXXX-XXXX" 
+                                 style={{ width: '100%', textAlign: 'center', fontSize: '18px', letterSpacing: '2px', fontFamily: 'monospace', padding: '15px' }} 
+                              />
+                              <button 
+                                 className="btn-primary" 
+                                 style={{ width: '100%', padding: '15px', fontWeight: 800 }} 
+                                 onClick={applyLicense}
+                              >
+                                 Activate Portal Now
+                              </button>
+                           </div>
+                           
+                           <div style={{ marginTop: '30px', padding: '20px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', fontSize: '13px', color: 'var(--muted)' }}>
+                              <p>Current Status: <span style={{ color: org.has_portal_access ? 'var(--teal)' : 'var(--amber)', fontWeight: 700 }}>{org.has_portal_access ? 'ACTIVE' : 'EXPIRED / LIMITED'}</span></p>
+                              {daysLeft && <p style={{ marginTop: '5px' }}>Expires in: {daysLeft} days</p>}
+                           </div>
                         </div>
                      </div>
-                  </div>
-               </div>
-            )}
+                  )}
+
+                  {/* CATCH-ALL FOR UPGRADING MODULES */}
+                  {activeTab !== 'overview' && activeTab !== 'monitoring' && activeTab !== 'master' && 
+                   activeTab !== 'subjects' && activeTab !== 'classrooms' && activeTab !== 'instructors' && 
+                   activeTab !== 'students' && activeTab !== 'schemas' && activeTab !== 'renew' && (
+                     <div className="fade-in">
+                        {/* Tab content placeholder for other tabs */}
+                        <div style={{ background: 'var(--ink2)', border: '1px solid var(--rim)', borderRadius: '16px', padding: '40px', textAlign: 'center' }}>
+                           <div style={{ fontSize: '40px', marginBottom: '16px' }}>🛠️</div>
+                           <h3 style={{ color: 'var(--white)' }}>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Module</h3>
+                           <p style={{ color: 'var(--soft)' }}>The full UI for this module is being upgraded. Functional components remain active below.</p>
+                        </div>
+                     </div>
+                  )}
 
             {activeTab === 'master' && org && (
                <div className="animate-fadeIn">
@@ -1945,8 +2023,10 @@ function ManagerDashboard({ token, logout }) {
                   </div>
                </div>
             )}
-        </div>
-      </div>
+                </main>
+             </div>
+          </div>
+       </div>
     );
 }
 
@@ -2329,56 +2409,302 @@ function DailyMonitoringView({ token }) {
    }
 
    function StudentDashboard({ token, logout }) {
-      const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+      const navigate = useNavigate();
+      const [activeTab, setActiveTab] = useState('dashboard');
       const [studentProfile, setStudentProfile] = useState(null);
-      const [studentView, setStudentView] = useState('tasks');
+      const [timetable, setTimetable] = useState([]);
+      const [selectedDay, setSelectedDay] = useState(new Date().getDay() > 0 && new Date().getDay() < 6 ? new Date().getDay() - 1 : 0);
+      const [showMobileMenu, setShowMobileMenu] = useState(false);
+      const [chatInput, setChatInput] = useState('');
+      const [messages, setMessages] = useState([
+         { id: 1, role: 'bot', text: "Hi! 👋 I'm your study assistant. Ask me anything about today's syllabus or any concept you're stuck on." }
+      ]);
+      const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+      const lastMessageRef = useRef(null);
 
       useEffect(() => {
          fetch(`${API_BASE_URL}/api/students/`, { headers: { 'Authorization': `Bearer ${token}` } })
             .then(res => res.json())
-            .then(data => data && data[0] && setStudentProfile(data[0]));
+            .then(data => {
+               if (data && data[0]) {
+                  setStudentProfile(data[0]);
+                  if (data[0].classroom) fetchTimetable(data[0].classroom);
+               }
+            });
       }, [token]);
 
-      return (
-         <div className="dashboard animate-fadeIn">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }} className="grid-mobile-stack">
-               <div>
-                  <h2 style={{ margin: 0 }}>Student <span className="nav-brand" style={{ fontSize: 'inherit' }}>Learning Hub</span></h2>
-                  {studentProfile && <p style={{ opacity: 0.7, margin: '0.5rem 0 0 0' }}>Welcome, {studentProfile.first_name}! Access your daily schedule and materials for <strong>{studentProfile.classroom_name}</strong>.</p>}
-               </div>
-               <div style={{ display: 'flex', gap: '1rem' }} className="grid-mobile-stack">
-                  <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.2rem', borderRadius: '8px' }}>
-                     <button onClick={() => setStudentView('tasks')} className={studentView === 'tasks' ? 'btn-primary' : 'btn-logout'} style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }}>Daily Feed</button>
-                     <button onClick={() => setStudentView('timetable')} className={studentView === 'timetable' ? 'btn-primary' : 'btn-logout'} style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }}>Class Timetable</button>
-                  </div>
-                  {studentView === 'tasks' && (
-                     <div className="form-group" style={{ marginBottom: 0 }}>
-                        <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', padding: '0.4rem' }} />
-                     </div>
-                  )}
-               </div>
-            </div>
+      const fetchTimetable = (classId) => {
+         fetch(`${API_BASE_URL}/api/timetables/?classroom=${classId}`, { headers: { 'Authorization': `Bearer ${token}` } })
+            .then(res => res.json())
+            .then(data => setTimetable(data));
+      };
 
-            {studentProfile?.classroom ? (
-               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2.5rem' }} className="grid-mobile-stack">
-                  <div>
-                     {studentView === 'tasks' ? (
-                        <DailyTaskCalendar token={token} classroomId={studentProfile.classroom} date={selectedDate} role="STUDENT" />
-                     ) : (
-                        <TimetableView token={token} type="CLASSROOM" id={studentProfile.classroom} />
-                     )}
-                  </div>
-                  <div>
-                     <SmartAssistant token={token} />
-                  </div>
-               </div>
-            ) : (
-               <div className="dashboard-card" style={{ textAlign: 'center', padding: '6rem', opacity: 0.5 }}>
-                  <i className="fas fa-lock" style={{ fontSize: '4rem', marginBottom: '2rem' }}></i>
-                  <h3>No classroom assigned yet.</h3>
-                  <p>Please contact your institution manager to link your profile to a classroom.</p>
-               </div>
-            )}
+      const handleSendChat = async () => {
+         if (!chatInput.trim()) return;
+         const userMsg = { id: Date.now(), role: 'user', text: chatInput };
+         setMessages(prev => [...prev, userMsg]);
+         setChatInput('');
+         
+         try {
+            const history = messages.map(m => ({
+               role: m.role === 'bot' ? 'model' : 'user',
+               text: m.text
+            }));
+
+            const res = await fetch(`${API_BASE_URL}/api/ask_ai/`, {
+               method: 'POST',
+               headers: { 
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}` 
+               },
+               body: JSON.stringify({ 
+                  query: chatInput,
+                  history: history,
+                  context: { // Send UI State
+                     active_tab: activeTab,
+                     selected_date: selectedDate
+                  }
+               })
+            });
+            const data = await res.json();
+            if (data.answer) {
+               const botMsg = { id: Date.now() + 1, role: 'bot', text: data.answer };
+               setMessages(prev => [...prev, botMsg]);
+            } else {
+               const botMsg = { id: Date.now() + 1, role: 'bot', text: `Sorry, I'm having trouble connecting: ${data.error || 'Unknown error'}` };
+               setMessages(prev => [...prev, botMsg]);
+            }
+         } catch (err) {
+            const botMsg = { id: Date.now() + 1, role: 'bot', text: "The AI assistant is currently unreachable. Please check your connection." };
+            setMessages(prev => [...prev, botMsg]);
+         }
+      };
+
+      useEffect(() => {
+         lastMessageRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, [messages]);
+
+      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+      const daySchedule = timetable.filter(t => t.day_of_week === selectedDay);
+
+      return (
+         <div className="dashboard-container" style={{ display: 'flex', minHeight: '100vh', background: 'var(--ink)' }}>
+             {/* Sidebar Overlay */}
+             <div className={`sidebar-overlay ${showMobileMenu ? 'visible' : ''}`} onClick={() => setShowMobileMenu(false)} />
+             
+             {/* SIDEBAR */}
+             <aside className={`sidebar ${showMobileMenu ? 'mobile-open' : ''}`} style={{ width: '260px', background: 'var(--ink2)', borderRight: '1px solid var(--rim)', display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh', zIndex: 100 }}>
+                <div style={{ padding: '24px 20px', borderBottom: '1px solid var(--rim)' }}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => navigate('/')}>
+                      <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '36px', height: '36px' }}>
+                        <rect width="40" height="40" rx="10" fill="#F5A623"/>
+                        <path d="M8 28L14 14L20 22L26 12L32 28" stroke="#0D0F14" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <span className="logo-text" style={{ fontSize: '20px', fontWeight: 700, color: 'var(--white)', letterSpacing: '-0.5px' }}>
+                         upgrade<span style={{ color: 'var(--amber)' }}>fied</span>
+                      </span>
+                   </div>
+                </div>
+
+                <nav style={{ flex: 1, padding: '20px 12px', overflowY: 'auto' }}>
+                   <SidebarLink active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<i className="fas fa-home"></i>} label="My Dashboard" />
+                   <SidebarLink active={activeTab === 'schedule'} onClick={() => setActiveTab('schedule')} icon={<i className="fas fa-calendar-alt"></i>} label="My Schedule" />
+                   <SidebarLink active={activeTab === 'homework'} onClick={() => setActiveTab('homework')} icon={<i className="fas fa-stream"></i>} label="Learning Feed" />
+                   <SidebarLink active={activeTab === 'grades'} onClick={() => setActiveTab('grades')} icon={<i className="fas fa-chart-bar"></i>} label="My Grades" />
+                   <SidebarLink active={activeTab === 'ai'} onClick={() => setActiveTab('ai')} icon={<i className="fas fa-robot"></i>} label="AI Assistant" />
+                   <SidebarLink active={activeTab === 'notifications'} onClick={() => setActiveTab('notifications')} icon={<i className="fas fa-bell"></i>} label="Notifications" />
+                </nav>
+
+                <div style={{ padding: '16px 12px', borderTop: '1px solid var(--rim)' }}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px' }}>
+                      <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'var(--teal)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#0D0F14' }}>
+                         {studentProfile ? Object.values(studentProfile.custom_data || {})[0]?.charAt(0) : 'S'}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--white)' }}>{studentProfile ? Object.values(studentProfile.custom_data || {})[0] : 'Student'}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--muted)' }}>{studentProfile?.classroom_name}</div>
+                      </div>
+                   </div>
+                </div>
+             </aside>
+
+             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+                <div style={{ flex: 1, overflowY: 'auto', background: 'var(--ink)', padding: '32px 36px' }}>
+                   {activeTab === 'dashboard' && (
+                      <div className="fade-in">
+                         {/* METRICS ROW */}
+                         <div className="metrics-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px' }}>
+                            <MetricCard label="My Avg Score" value="82%" change="+4 pts improvement" up color="amber" />
+                            <MetricCard label="Attendance" value="96%" change="Excellent record" up color="teal" />
+                            <MetricCard label="HW Due Today" value="2" change="Math, Physics" color="rose" />
+                            <MetricCard label="Next Test" value="Friday" change="Chemistry" color="violet" />
+                         </div>
+
+                         <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '24px', minHeight: 'calc(100vh - 250px)' }}>
+                            
+                            {/* TODAY'S SCHEDULE */}
+                            <div className="section-card" style={{ padding: '24px' }}>
+                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                                  <h3 className="sc-title">Today's Schedule</h3>
+                                  <div style={{ display: 'flex', gap: '8px' }}>
+                                     {days.map((d, i) => (
+                                        <button 
+                                           key={d} 
+                                           onClick={() => setSelectedDay(i)}
+                                           style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--rim)', background: selectedDay === i ? 'var(--amber-glow)' : 'var(--ink3)', color: selectedDay === i ? 'var(--amber)' : 'var(--muted)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                                        >
+                                           {d}
+                                        </button>
+                                     ))}
+                                  </div>
+                               </div>
+
+                               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                  {daySchedule.length > 0 ? (
+                                     daySchedule.sort((a,b) => a.start_time.localeCompare(b.start_time)).map((slot, idx) => {
+                                        const isActive = idx === 1; // Simulation
+                                        const isDone = idx === 0; // Simulation
+                                        return (
+                                           <div key={idx} style={{ display: 'flex', gap: '16px' }}>
+                                              <div style={{ width: '60px', textAlign: 'right', paddingTop: '8px' }}>
+                                                 <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--white)' }}>P{idx+1}</div>
+                                                 <div style={{ fontSize: '11px', color: 'var(--muted)' }}>{slot.start_time.slice(0,5)}</div>
+                                              </div>
+                                              <div style={{ flex: 1, padding: '16px', background: isActive ? 'var(--amber-glow)' : 'var(--ink2)', border: isActive ? '1px solid var(--amber-rim)' : '1px solid var(--rim)', borderRadius: '12px', position: 'relative' }}>
+                                                 {isActive && <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px', background: 'var(--amber)' }} />}
+                                                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                    <div style={{ fontSize: '15px', fontWeight: 700, color: isActive ? 'var(--white)' : 'var(--soft)' }}>
+                                                       {slot.subject_name} {isDone && '✓'} {isActive && '← Now'}
+                                                    </div>
+                                                    {isDone && <span style={{ fontSize: '10px', color: 'var(--teal)', fontWeight: 700 }}>Done</span>}
+                                                 </div>
+                                                 <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '4px' }}>{slot.instructor_name}</div>
+                                              </div>
+                                           </div>
+                                        );
+                                     })
+                                  ) : (
+                                     <div style={{ padding: '60px', textAlign: 'center', color: 'var(--muted)' }}>No classes scheduled for {days[selectedDay]}</div>
+                                  )}
+                               </div>
+                            </div>
+
+                            {/* AI ASSISTANT MINI-PANEL */}
+                            <div className="section-card" style={{ display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
+                               <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--rim)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                  <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'var(--amber-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--amber)' }}><i className="fas fa-robot"></i></div>
+                                  <div>
+                                     <h3 className="sc-title" style={{ fontSize: '15px' }}>Quick AI Help</h3>
+                                     <p className="sc-subtitle" style={{ fontSize: '11px', color: 'var(--teal)' }}>● Online</p>
+                                  </div>
+                               </div>
+                               <div style={{ flex: 1, padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                  {messages.slice(-2).map((m) => (
+                                     <div key={m.id} style={{ alignSelf: m.role === 'bot' ? 'flex-start' : 'flex-end', maxWidth: '90%' }}>
+                                        <div style={{ padding: '10px 14px', borderRadius: '12px', background: m.role === 'bot' ? 'var(--ink3)' : 'var(--amber)', color: m.role === 'bot' ? 'var(--soft)' : '#0D0F14', fontSize: '13px' }}>{m.text}</div>
+                                     </div>
+                                  ))}
+                                  <div ref={lastMessageRef} />
+                               </div>
+                               <div style={{ padding: '16px', borderTop: '1px solid var(--rim)' }}>
+                                  <button className="btn-sm btn-sm-amber" style={{ width: '100%' }} onClick={() => setActiveTab('ai')}>Open Full Assistant</button>
+                               </div>
+                            </div>
+                         </div>
+                      </div>
+                   )}
+
+                   {activeTab === 'schedule' && studentProfile && (
+                      <div className="fade-in">
+                         <h2 style={{ marginBottom: '20px' }}>Comprehensive Schedule</h2>
+                         <div className="section-card" style={{ padding: '0', overflow: 'hidden' }}>
+                            <TimetableView token={token} type="CLASSROOM" id={studentProfile.classroom} />
+                         </div>
+                      </div>
+                   )}
+
+                   {activeTab === 'homework' && studentProfile && (
+                      <div className="fade-in">
+                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }} className="grid-mobile-stack">
+                            <div>
+                               <h2 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--white)', margin: 0 }}>Learning Feed</h2>
+                               <p style={{ color: 'var(--muted)', fontSize: '14px', marginTop: '4px' }}>Classwork, Homework & Daily Updates</p>
+                            </div>
+                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                               <span style={{ fontSize: '13px', color: 'var(--muted)', fontWeight: 600 }}>Select Date:</span>
+                               <input 
+                                  type="date" 
+                                  value={selectedDate} 
+                                  onChange={e => setSelectedDate(e.target.value)} 
+                                  className="btn-secondary" 
+                                  style={{ padding: '10px 16px', borderRadius: '10px', background: 'var(--ink2)', border: '1px solid var(--rim)', color: 'var(--white)', cursor: 'pointer' }} 
+                               />
+                            </div>
+                         </div>
+
+                         <div className="section-card" style={{ padding: '0', background: 'transparent', border: 'none' }}>
+                            <DailyTaskCalendar token={token} classroomId={studentProfile.classroom} date={selectedDate} role="STUDENT" />
+                         </div>
+                      </div>
+                   )}
+
+                   {activeTab === 'grades' && (
+                      <div className="fade-in">
+                         <h2 style={{ marginBottom: '20px' }}>Academic Performance</h2>
+                         <div className="section-card" style={{ padding: '40px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '48px', marginBottom: '20px' }}>📈</div>
+                            <h3 style={{ color: 'var(--white)' }}>Gradebook Under Review</h3>
+                            <p style={{ color: 'var(--muted)' }}>End of term grades are being processed by your instructors.</p>
+                         </div>
+                      </div>
+                   )}
+
+                   {activeTab === 'ai' && (
+                      <div className="fade-in" style={{ height: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column' }}>
+                         <div className="section-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 0 }}>
+                            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--rim)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                               <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'var(--amber-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--amber)' }}><i className="fas fa-robot"></i></div>
+                               <div>
+                                  <h3 className="sc-title">Upgradefied AI Study Partner</h3>
+                                  <p className="sc-subtitle" style={{ color: 'var(--teal)' }}>● Ready to help with your curriculum</p>
+                               </div>
+                            </div>
+                            <div style={{ flex: 1, padding: '24px', overflowY: 'auto' }}>
+                               {messages.map(m => (
+                                  <div key={m.id} style={{ marginBottom: '20px', display: 'flex', flexDirection: 'column', alignItems: m.role === 'bot' ? 'flex-start' : 'flex-end' }}>
+                                     <div style={{ maxWidth: '70%', padding: '16px', borderRadius: '20px', background: m.role === 'bot' ? 'var(--ink3)' : 'var(--amber)', color: m.role === 'bot' ? 'var(--soft)' : '#1a1a1a', border: m.role === 'bot' ? '1px solid var(--rim)' : 'none' }}>{m.text}</div>
+                                  </div>
+                               ))}
+                               <div ref={lastMessageRef} />
+                            </div>
+                            <div style={{ padding: '24px', borderTop: '1px solid var(--rim)' }}>
+                               <div style={{ display: 'flex', gap: '12px', background: 'var(--ink3)', padding: '12px', borderRadius: '16px' }}>
+                                  <input 
+                                     placeholder="Type your question here..." 
+                                     value={chatInput}
+                                     onChange={e => setChatInput(e.target.value)}
+                                     onKeyPress={e => e.key === 'Enter' && handleSendChat()}
+                                     style={{ flex: 1, background: 'transparent', border: 'none', color: 'white' }} 
+                                  />
+                                  <button onClick={handleSendChat} style={{ background: 'var(--amber)', border: 'none', width: '44px', height: '44px', borderRadius: '12px', color: '#1a1a1a' }}><i className="fas fa-paper-plane"></i></button>
+                               </div>
+                            </div>
+                         </div>
+                      </div>
+                   )}
+
+                   {activeTab === 'notifications' && (
+                      <div className="fade-in">
+                         <h2 style={{ marginBottom: '20px' }}>Notifications Center</h2>
+                         <div className="section-card" style={{ padding: '40px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '48px', marginBottom: '20px' }}>🔔</div>
+                            <h3 style={{ color: 'var(--white)' }}>All Clear</h3>
+                            <p style={{ color: 'var(--muted)' }}>No new alerts for today. Enjoy your classes!</p>
+                         </div>
+                      </div>
+                   )}
+                </div>
+             </div>
          </div>
       );
    }
@@ -2426,7 +2752,7 @@ function DailyMonitoringView({ token }) {
                   <i className="fas fa-robot"></i>
                </div>
                <div>
-                  <h4 style={{ margin: 0, fontSize: '0.95rem' }}>DailyTracker Smart Assistant</h4>
+                  <h4 style={{ margin: 0, fontSize: '0.95rem' }}>upgradefied Smart Assistant</h4>
                   <p style={{ margin: 0, fontSize: '0.7rem', opacity: 0.6 }}>Instant answers to school queries</p>
                </div>
             </div>
